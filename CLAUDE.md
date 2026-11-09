@@ -9,7 +9,7 @@
 - 原型：`…/prototype/`（轉址到最新版）、版本說明 `…/prototype/release-note/`
 
 > **repo 是公開的（2026-11-09 確認），Pages 網站也沒有登入機制。** 推上來的東西任何人都看得到，也永久留在 git 歷史。
-> API Key、Token、帳密、內網 IP 一律不可進 repo。`prod/data/` 的真實資料要怎麼保護，上線前要先決定：見 [prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md) 第 0 節。
+> API Key、Token、帳密、內網 IP 一律不可進 repo。`prod/data.json` 的真實資料要怎麼保護，上線前要先決定：見 [prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md) 第 0 節。
 
 ---
 
@@ -18,7 +18,7 @@
 | 路徑 | 內容 | 進版控 | 文件 |
 | --- | --- | --- | --- |
 | `index.html` | 轉址到 `prod/` | ✓ | — |
-| `prod/` | 正式版：`index.html`（以原型 v7 為基礎，只保留緊急醫療，數字由資料即時計算）＋ `data/data.json`（排程主機定期 push） | ✓ | [prod/CLAUDE.md](prod/CLAUDE.md)、[prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md) |
+| `prod/` | 正式版：`index.html`（以原型 v7 為基礎，只保留緊急醫療，數字由資料即時計算）＋ `data.json`（排程主機定期 push） | ✓ | [prod/CLAUDE.md](prod/CLAUDE.md)、[prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md) |
 | `prototype/` | `v1/`–`v8/` 原型（最新 `v8/`）、`release-note/`、轉址頁 `index.html` | ✓ | [prototype/CLAUDE.md](prototype/CLAUDE.md) |
 | `kpi/` | `kpi.csv` 指標清單、`original_list.xlsx` 客戶原始清單。**只留本機**，不要 `git add -f` | ✗（`.gitignore`） | 第 6 節 |
 | `.github/workflows/pages.yml` | Pages 部署 | ✓ | **不要改**，除非使用者明確要求 |
@@ -29,9 +29,9 @@
 
 ## 2. 資料與排程（誰動哪些檔）
 
-- `prod/data/` 屬於排程主機上的另一個專案：它定期從平台撈全部緊急醫療通報，**整份覆寫** `prod/data/data.json` 後 push 到 `main`。
+- `prod/data.json` 屬於排程主機上的另一個專案：它定期從平台撈全部緊急醫療通報，**整份覆寫**這個檔後 push 到 `main`。
   排程要拿到什麼、怎麼放，全部寫在 [prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md)；本 repo 不記排程的實作。
-- 開發時**不要手動改 `prod/data/`、不要把測試資料 commit 進去**。測別的資料用 file:// 選檔或 Playwright 攔截（見 prod/CLAUDE.md 第 4 節）。
+- 開發時**不要手動改 `prod/data.json`、不要把測試資料 commit 進去**。測別的資料用 file:// 選檔或 Playwright 攔截（見 prod/CLAUDE.md 第 4 節）。
 - 格式要改：先改 DATA_CONTRACT.md，儀表板先支援新格式並上線，排程再切換。
 - 排程會一直推 `main`，所以**每次 push 前先 `git pull --rebase`**。
 

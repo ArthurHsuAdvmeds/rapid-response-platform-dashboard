@@ -1,13 +1,13 @@
 # prod — 正式版儀表板（真實資料）
 
 三總北投精神健康個案通報管理儀表板的正式版。版面沿用原型 v7，只保留緊急醫療（基本資料／風險／效率／通報者／指揮儀表板），
-畫面上的每個數字都由 `data/data.json` 即時計算；HTML 裡原型留下的數字只是佔位，載入完成前整頁隱藏。
-前身是 advmeds-prototype 的 `tsghb-dashboard/real-data/20261103/`，2026-11 搬來這裡，資料檔改放 `data/`。
+畫面上的每個數字都由同資料夾的 `data.json` 即時計算；HTML 裡原型留下的數字只是佔位，載入完成前整頁隱藏。
+前身是 advmeds-prototype 的 `tsghb-dashboard/real-data/20261103/`，2026-11 搬來這裡。
 
-- **`data/data.json` 的格式、排程要遵守的事、待確認問題，全部以 [DATA_CONTRACT.md](DATA_CONTRACT.md) 為準。** 本文件只記儀表板端。
-- `data/` 屬於排程主機（另一個專案），它定期全量產生 data.json 並 push。**不要手動改、不要 commit 測試資料進去**；測別的資料見第 4 節。
+- **`data.json` 的格式、排程要遵守的事、待確認問題，全部以 [DATA_CONTRACT.md](DATA_CONTRACT.md) 為準。** 本文件只記儀表板端。
+- `data.json` 屬於排程主機（另一個專案），它定期全量產生並 push。**不要手動改、不要 commit 測試資料進去**；測別的資料見第 4 節。
 - repo 與 Pages 都是公開的，上線前要先決定資料怎麼保護：見 DATA_CONTRACT.md 第 0 節。
-- 目前的 `data/data.json` 是使用者提供的 14 筆（通報日 2026/10/05–11/03），還是舊格式（沒有 `schemaVersion`、`updatedAt` 只有日期）；儀表板相容，排程第一次執行就會換成新格式。
+- 目前的 `data.json` 是使用者提供的 14 筆（通報日 2026/10/05–11/03），還是舊格式（沒有 `schemaVersion`、`updatedAt` 只有日期）；儀表板相容，排程第一次執行就會換成新格式。
 
 ---
 
@@ -15,7 +15,7 @@
 
 全部集中在 `index.html` 檔尾的 `<style id="real-data">` 與 `<script id="real-data">`（`window.RD`）。前面兩萬行是 v7 原型的版面與互動，數字不從那裡來。
 
-- **載入**：`loadFromServer()` 以 `cache:'no-store'` fetch `DATA_FILE`（`data/data.json`）→ `parseJsonLoose()`（標準 JSON 失敗時去掉註解與結尾逗號再試）→ `start()`。
+- **載入**：`loadFromServer()` 以 `cache:'no-store'` fetch `DATA_FILE`（同資料夾的 `data.json`）→ `parseJsonLoose()`（標準 JSON 失敗時去掉註解與結尾逗號再試）→ `start()`。
   `file://` 下 fetch 一定被擋，直接顯示「選擇 data.json」（`showError(null)` → `loadFromPicker()`）。
 - **`build()`**：`schemaVersion` 不等於 `SCHEMA_VERSION`（目前 1，沒有這個鍵視為 1）就丟錯、整頁不畫 → 每筆 `normalizeCase()` →
   資料品質計數 `RD.stats`（`badTime` 排除、`badStatus`、`unmappedDept`、`dupId`）→ 決定 `updatedAt`／`asOf`／`dataStart`。
@@ -79,11 +79,11 @@
 
 - **file:// 直接開檔**：頁首出現「選擇 data.json」，選了就載入（只在瀏覽器內讀，不上傳；檔名不限）。
 - **本機伺服器**：見根目錄 CLAUDE.md「本機驗證」，開 `http://127.0.0.1:8771/rapid-response-platform-dashboard/prod/`。
-- **測別的資料不要動 `data/`**：Playwright 用 `page.route('**/data/data.json', …)` 攔截換成測試檔，或 file:// 選檔。
+- **測別的資料不要動 `data.json`**：Playwright 用 `page.route('**/prod/data.json', …)` 攔截換成測試檔，或 file:// 選檔。
 - 改程式或換資料後檢查：頁首「資料更新」、總案件數、黃色提示是否符合預期；console 只能有本機伺服器的 favicon 404。
 - **要改格式（schemaVersion 加 1）時**：先改 DATA_CONTRACT.md，再讓 `build()` 同時接受新舊版本並上線，最後才讓排程切換。
 
 ## 5. 之後擴充
 
 - **優化計畫**：`build()` 只讀 `emg`；指揮板 `renderCommand()` 只有緊急醫療一列。被移除的頁面與頁籤可以從 `../prototype/v7/` 對照取回。
-- **另一個資料檔**（例如 `data/his.json`）：`loadFromServer()` 改成一起載入，缺檔或失敗的區塊顯示「尚無資料」，各檔的 `updatedAt` 分別顯示。
+- **另一個資料檔**（例如同層的 `his.json`）：`loadFromServer()` 改成一起載入，缺檔或失敗的區塊顯示「尚無資料」，各檔的 `updatedAt` 分別顯示。

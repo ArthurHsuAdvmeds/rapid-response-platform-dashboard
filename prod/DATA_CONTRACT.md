@@ -4,7 +4,7 @@
 排程怎麼向平台撈資料，寫在排程專案自己的文件，不在這裡。
 
 - 儀表板網址：`https://arthurhsuadvmeds.github.io/rapid-response-platform-dashboard/prod/`
-- 資料檔：`prod/data/data.json`（儀表板只讀這一個檔）
+- 資料檔：`prod/data.json`（與 `prod/index.html` 同層；儀表板只讀這一個檔）
 - 格式版本：`schemaVersion: 1`（2026-11-09 訂）
 - 標 ★ 的是還沒確認的地方，問題集中在第 5 節。
 
@@ -13,7 +13,7 @@
 ## 0. 開始排程前要先決定：repo 與網站都是公開的
 
 - 2026-11-09 確認 repo `ArthurHsuAdvmeds/rapid-response-platform-dashboard` 是 **public**。
-  GitHub Pages 網站本身沒有登入機制（repo 改成 private，Pages 網址照樣任何人都能開），知道網址就能下載 `prod/data/data.json`。
+  GitHub Pages 網站本身沒有登入機制（repo 改成 private，Pages 網址照樣任何人都能開），知道網址就能下載 `prod/data.json`。
 - 每一次 push 都永久留在 git 歷史裡；事後刪檔、改 private，都收不回已經被下載或 fork 的內容。
 - 資料是精神醫療緊急個案：座標（目前精確到公尺級）＋年齡＋性別＋通報時間，合起來足以指認到人，屬個資法第 6 條的醫療特種個資。
 - 開始定期 push 前先選一種做法，選定後把結果寫回這一節：
@@ -26,7 +26,7 @@
 
 ## 1. 需要排程做的事
 
-1. **每次都是全量快照**：撈平台上**全部**緊急醫療通報（不限日期），整份覆寫 `prod/data/data.json`。不做增量、不跟舊檔合併。
+1. **每次都是全量快照**：撈平台上**全部**緊急醫療通報（不限日期），整份覆寫 `prod/data.json`。不做增量、不跟舊檔合併。
    案件狀態會變（待派 → 已派 → 結案），作廢的通報也要消失，整份重產最不會錯。
 2. **每次執行都更新 `updatedAt` 並 push**，就算案件內容一筆都沒變。
    儀表板拿 `updatedAt` 的日期當「今天」（本日／本月／本季／本年度的基準），也拿它判斷資料新不新：
@@ -36,7 +36,7 @@
    - 是標準 JSON（不帶註解、沒有結尾逗號）；`schemaVersion` 是 `1`；`emg` 是陣列。
    - 每筆都有 `reportId`（不重複）與可解析的 `timePoint.reportedAt`。
    - 筆數不是 0，也沒有比上一版明顯變少（門檻由排程專案決定）。全量快照照理只增不減，突然變少多半是撈資料出錯，推上來儀表板就跟著變空。
-4. **只動 `prod/data/data.json`**，不改 repo 裡的其他檔（程式、文件、workflow）。
+4. **只動 `prod/data.json`**，不改 repo 裡的其他檔（程式、文件、workflow）。
 5. **git**：
    - push 前 `git pull --rebase`（儀表板開發也會推 `main`）；被拒絕就重新 pull 再推，**不要 force push**。
    - commit message 固定格式，方便在 log 裡篩：`prod data 2026-11-09 06:00（緊急醫療 123 筆）`。
@@ -49,7 +49,7 @@
 
 ## 2. 檔案怎麼放
 
-- 只有一個檔：`prod/data/data.json`，UTF-8（不要 BOM）、LF 換行。
+- 只有一個檔：`prod/data.json`，UTF-8（不要 BOM）、LF 換行。
 - 建議**一筆通報一行**，依 `timePoint.reportedAt`、再依 `reportId` 排序，每筆的欄位順序固定（照 3.2 表格的順序）。
   git diff 只會出現有變動的那幾筆，檔案也只有縮排排版的一半大（目前每筆約 0.4 KB）：
 
@@ -69,7 +69,7 @@
 - 大小不是問題：每年 1,000 筆約 0.4 MB，十年也才幾 MB，GitHub Pages 傳輸時還會壓縮。
 - **要不要拆檔，只看「誰產生、多久產生一次」**：
   - 同一支排程、同一個來源、同一次執行產生的 → 同一個檔，用最外層的鍵分類（現在的 `emg`，之後的優化計畫再加一個鍵）。
-  - 不同來源或不同頻率（例如之後的 HIS 資料由另一支程式產生）→ 在 `prod/data/` 另開一個檔，外框一樣有 `schemaVersion`、`updatedAt`，
+  - 不同來源或不同頻率（例如之後的 HIS 資料由另一支程式產生）→ 在 `prod/` 另開一個同層的檔（例如 `prod/his.json`），外框一樣有 `schemaVersion`、`updatedAt`，
     兩邊各自顯示更新時間，一邊壞了不影響另一邊。
   - 真的大到拖慢載入（例如超過 10 MB）再考慮依年度拆案件陣列，現在不用。
 
@@ -180,7 +180,7 @@
 - **優化計畫**：同一來源、同一支排程 → 同一個檔加一個陣列（例如 `opt`）。
   共用的欄位沿用 `emg` 的名稱與代碼（`reportId`、`reporterDepartment`、`caseInfo`、`assess`、`timePoint.reportedAt`／`assignedAt`、`status`）；
   優化計畫特有的時間點與結果（衛生局回覆單、不轉介覆核、醫療機構回覆單、訪視、追蹤量表…）等儀表板要恢復那些頁面時再訂。
-- **HIS 衍生資料**（結案後就醫、SNQ）：由另一支程式、另一個頻率產生時 → `prod/data/his.json`，外框同樣有 `schemaVersion`、`updatedAt`。
+- **HIS 衍生資料**（結案後就醫、SNQ）：由另一支程式、另一個頻率產生時 → `prod/his.json`，外框同樣有 `schemaVersion`、`updatedAt`。
   以 `reportId` 對應案件；**身分證比對在排程端做完，不放進檔案**；SNQ 只放彙總數字。
 - **平台使用率**：只放各單位的總帳號數、曾登入帳號數，不放帳號明細。
 - **版本規則**：

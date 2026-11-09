@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>三軍總醫院北投分院｜精神健康個案通報管理儀表板</title>
 <meta name="robots" content="noindex, nofollow">
-<!-- prod：正式版（真實資料），版面以 prototype/v7 為基礎；數字由 data/data.json 計算，見檔尾 <script id="real-data"> 與 DATA_CONTRACT.md -->
+<!-- prod：正式版（真實資料），版面以 prototype/v7 為基礎；數字由同資料夾的 data.json 計算，見檔尾 <script id="real-data"> 與 DATA_CONTRACT.md -->
 <style>
   :root{
     --blue:#40a5f3;
@@ -12489,7 +12489,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const GEO_TOWNS_URL = 'https://cdn.jsdelivr.net/npm/taiwan-atlas/towns-10t.json';
   const TAIPEI_CODE = '63000';
   /* ===== 個案點位圖層：依地址 GPS 座標定位、依初評風險上色 =====
-     real-data：案件來自 data/data.json，由檔尾的 real-data 模組載入；
+     real-data：案件來自同資料夾的 data.json，由檔尾的 real-data 模組載入；
      RD.basicCases() 回傳基本資料頁目前日期區間內的案件。
      ・各縣市／行政區件數與初評風險組成：算該縣市的全部案件（含沒有座標的）
      ・點位：只畫有 latitude／longitude 的案件；同址合併依 address_key，沒有時以座標（小數 5 位）判斷同址
@@ -21017,7 +21017,7 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
 
 <script id="real-data">
 /* =========================================================================
-   real-data：畫面上的數字全部由 data/data.json 計算，取代原型的模擬資料
+   real-data：畫面上的數字全部由同資料夾的 data.json 計算，取代原型的模擬資料
    -------------------------------------------------------------------------
    data.json 由排程主機定期產生並 push，格式（欄位、代碼、時間）以 prod/DATA_CONTRACT.md 為準。重點：
    ・最外層是 {"schemaVersion":1, "updatedAt":…, "emg":[...]}，一筆緊急醫療通報一個物件；本檔只保留緊急醫療，其他鍵（之後的優化計畫）不讀
@@ -21033,7 +21033,7 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
 (()=>{
   'use strict';
 
-  const DATA_FILE = 'data/data.json';
+  const DATA_FILE = 'data.json';
   /* data.json 的格式版本。改名、刪欄位、改代碼意義時排程與本檔一起加 1；只新增選填欄位不用改 */
   const SCHEMA_VERSION = 1;
   /* 排程至少每天跑一次；updatedAt 距今超過這個時數就在頁首提示，避免排程停了沒人發現 */
@@ -21691,7 +21691,7 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
     const local=location.protocol==='file:';
     const why=err
       ? `資料載入失敗：${esc(err.message || err)}。`
-      : '以 file:// 直接開檔時，瀏覽器不允許網頁自動讀取 data/data.json。';
+      : '以 file:// 直接開檔時，瀏覽器不允許網頁自動讀取同資料夾的 data.json。';
     el.classList.add('rd-error');
     el.innerHTML=`<span>${why}</span>`
       +`<label class="rd-pick">選擇 data.json<input type="file" accept=".json,application/json"></label>`
