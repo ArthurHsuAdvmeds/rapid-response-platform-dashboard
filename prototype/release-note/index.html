@@ -333,6 +333,7 @@ footer{
       依「V9 調整」重整「醫療機構端處理成效分析」：指標分成「優化計畫專屬指標」與「共同指標」兩區，
       新增優化計畫結案個案轉介率（含四項醫療資源轉介）、機構結案失聯率、機構結案拒訪率、已開案後每月門診／急診次數變化，
       移除不在清單上的三項指標。畫面數字為原型模擬資料；其餘各頁內容與資料均未更動。
+      同日依「V9 追加」再調整：轉介他院改為轉介松德院區、衛生局醫療轉介率分母確認、醫療資源轉介四項改用正式名稱（第 7–9 項）。
     </p>
 
     <div class="group">
@@ -367,13 +368,13 @@ footer{
             <h3>新增「優化計畫結案個案轉介率」<span class="tag new">新增</span></h3>
           </div>
           <p>
-            大字是四項醫療資源轉介中任一項有轉介的比率（全部），下方四格是四項各自的比率。
+            大字是四項醫療資源轉介中任一項有轉介的比率（全部），下方四列是四項各自的比率。
           </p>
           <div class="detail">
             <ul>
               <li><b>計算方式</b>：結案個案轉介資源人數 ÷ 收案總人數；依結案訪視紀錄單「醫療資源轉介」的四個選項，任一項有轉介就計入分子</li>
               <li><b>四項各自</b>：該項轉介人數 ÷ 收案總人數；一人可勾多項，四項相加會超過「任一項」</li>
-              <li>四個選項名稱暫用「門診、住院、居家治療、日間留院」，待確認</li>
+              <li>四個選項：醫療資源、社區支持資源、社區心理衛生中心、EIP計畫（V9 追加確認，見第 9 項）</li>
               <li>卡片標題用簡稱；完整名稱「疑似或社區精神病人照護優化計畫結案個案轉介率」列在指標計算說明，下兩項同</li>
             </ul>
           </div>
@@ -474,13 +475,84 @@ footer{
       </ul>
     </div>
 
+    <div class="group">
+      <h3 class="group-title">V9 追加</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">7</span>
+            <h3>「轉介他院」改為「轉介松德院區」<span class="tag rename">更名</span></h3>
+          </div>
+          <p>
+            衛生局轉介目前只會有「轉介三總北投」與「轉介松德院區」兩種，不會轉介他院。盤點所有出現「轉介他院」的地方，共三處：
+          </p>
+          <div class="detail">
+            <ul>
+              <li><b>衛生局回覆單分流結果</b>：「轉介他院」改為「轉介松德院區」，區塊右上的流程說明同步修改</li>
+              <li><b>衛生局醫療轉介率、本院醫療轉介占率</b>：指標說明寫明「轉介醫療機構」＝轉介三總北投＋轉介松德院區</li>
+              <li><b>優化計畫無法收案原因</b>：「未轉介 / 轉介他院」改為「未轉介」</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">案件處理效率指標</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">優化計畫衛生局處置效率</span>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">醫療機構端處理成效分析</span>
+            <span class="sep">›</span>
+            <span class="crumb">優化計畫無法收案</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">8</span>
+            <h3>「衛生局醫療轉介率」分母確認為已完成回覆單<span class="tag fix">定義確認</span></h3>
+          </div>
+          <p>
+            衛生局醫療轉介率＝轉介醫療機構案件數 ÷ 衛生局完成回覆單案件數。數字不變，拿掉卡片上的「定義待確認」標記，指標說明也刪去待確認的註記。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">案件處理效率指標</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">優化計畫衛生局處置效率</span>
+            <span class="sep">›</span>
+            <span class="crumb">衛生局醫療轉介率</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">9</span>
+            <h3>醫療資源轉介四項改用正式名稱<span class="tag rename">更名</span></h3>
+          </div>
+          <p>
+            結案訪視紀錄單「醫療資源轉介」的四個選項為：醫療資源、社區支持資源、社區心理衛生中心、EIP計畫。
+          </p>
+          <div class="detail">
+            <ul>
+              <li>名稱較長，四項由兩欄小格改為一列一項，任何尺寸都不會被截斷</li>
+              <li>為了不增加卡片高度，這張卡改以四項明細取代進度條</li>
+              <li>指標計算說明同步列出四項名稱</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">醫療機構端處理成效分析</span>
+            <span class="sep">›</span>
+            <span class="crumb">優化計畫結案個案轉介率</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
     <div class="open-questions">
       <h3>待確認事項</h3>
       <ol>
-        <li>
-          <b>醫療資源轉介的四個選項名稱。</b>
-          目前暫用門診、住院、居家治療、日間留院，請提供結案訪視紀錄單上的實際選項。
-        </li>
         <li>
           <b>成效頁「後續醫療資源使用狀況」是否保留。</b>
           本頁的每月門診／急診次數變化與已結案後三項，和該子頁籤是同一組指標，目前兩頁都有。

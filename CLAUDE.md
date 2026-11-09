@@ -1,11 +1,12 @@
 # rapid-response-platform-dashboard
 
 三軍總醫院北投分院「精神健康個案通報管理儀表板」。2026-11 從 advmeds-prototype 的 `tsghb-dashboard/` 獨立出來：
-`prod/` 是接平台真實資料的正式版，`prototype/` 是 v1–v8 原型（模擬資料）。
+`prod/` 是接平台真實資料的正式版，`qa/` 是 V9 版面接資料的驗證版（驗證過再更新到 prod），`prototype/` 是 v1–v9 原型（模擬資料）。
 
 全部是靜態檔，push 到 `main` 後由 GitHub Actions（`.github/workflows/pages.yml`）把整個 repo 原樣部署到 GitHub Pages，**沒有 build、套件管理或測試流程**。
 
 - 網址：`https://arthurhsuadvmeds.github.io/rapid-response-platform-dashboard/`（根目錄轉址到 `prod/`）
+- 驗證版：`…/qa/`
 - 原型：`…/prototype/`（轉址到最新版）、版本說明 `…/prototype/release-note/`
 
 > **repo 是公開的（2026-11-09 確認），Pages 網站也沒有登入機制。** 推上來的東西任何人都看得到，也永久留在 git 歷史。
@@ -19,8 +20,10 @@
 | --- | --- | --- | --- |
 | `index.html` | 轉址到 `prod/` | ✓ | — |
 | `prod/` | 正式版：`index.html`（以原型 v7 為基礎，只保留緊急醫療，數字由資料即時計算）＋ `data.json`（排程主機定期 push） | ✓ | [prod/CLAUDE.md](prod/CLAUDE.md)、[prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md) |
+| `qa/` | 驗證版：`index.html`（原型 v9 全部頁面接資料，AI 頁與同期比較先隱藏，平台起始日固定 2026/10/05）＋ `data.json`（schemaVersion 2）＋ `data-platform.json`（SNQ、平台使用率）；目前兩個資料檔是虛構範例；另有兩個資料範本 `*.template.jsonc` | ✓ | [qa/CLAUDE.md](qa/CLAUDE.md)、[qa/DATA_CONTRACT.md](qa/DATA_CONTRACT.md) |
 | `prototype/` | `v1/`–`v9/` 原型（最新 `v9/`）、`release-note/`、轉址頁 `index.html` | ✓ | [prototype/CLAUDE.md](prototype/CLAUDE.md) |
 | `V9調整.md` | 客戶對 v9「醫療機構端處理成效分析」的調整清單（v9 的需求來源） | 使用者決定 | — |
+| `.tool/` | 本機工具：`qa_sample_data.py` 產生 qa 的虛構範例資料；也放驗證腳本與截圖 | ✗（`.gitignore`） | — |
 | `kpi/` | `kpi.csv` 指標清單、`original_list.xlsx` 客戶原始清單。**只留本機**，不要 `git add -f` | ✗（`.gitignore`） | 第 6 節 |
 | `.github/workflows/pages.yml` | Pages 部署 | ✓ | **不要改**，除非使用者明確要求 |
 
@@ -32,7 +35,9 @@
 
 - `prod/data.json` 屬於排程主機上的另一個專案：它定期從平台撈全部緊急醫療通報，**整份覆寫**這個檔後 push 到 `main`。
   排程要拿到什麼、怎麼放，全部寫在 [prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md)；本 repo 不記排程的實作。
-- 開發時**不要手動改 `prod/data.json`、不要把測試資料 commit 進去**。測別的資料用 file:// 選檔或 Playwright 攔截（見 prod/CLAUDE.md 第 4 節）。
+- `qa/data.json`、`qa/data-platform.json` 之後也由平台專案產生（新格式 schemaVersion 2，見 [qa/DATA_CONTRACT.md](qa/DATA_CONTRACT.md)）；在那之前是 `.tool/qa_sample_data.py` 產生的虛構範例。
+  qa 驗證期間 prod 照舊讀 v1 的 `prod/data.json`，驗證通過後 prod 換成 qa 的版面與格式（qa/CLAUDE.md 第 6 節）。
+- 開發時**不要手動改 `prod/data.json`、`qa/` 的兩個資料檔，也不要把測試資料 commit 進去**。測別的資料用 file:// 選檔或 Playwright 攔截（見 prod/CLAUDE.md 第 4 節、qa/CLAUDE.md 第 5 節）。
 - 格式要改：先改 DATA_CONTRACT.md，儀表板先支援新格式並上線，排程再切換。
 - 排程會一直推 `main`，所以**每次 push 前先 `git pull --rebase`**。
 

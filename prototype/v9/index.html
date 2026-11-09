@@ -12413,7 +12413,7 @@
 
     <!-- ===== Tab 3：優化計畫衛生局處置效率 ===== -->
     <div class="eff-v79-panel" data-eff-panel="bureau" hidden>
-      <div class="eff-v79-section-heading"><div><span>優化計畫衛生局處置效率</span><h3>衛生局回覆與轉介</h3></div><small>通報轉介單 → 衛生局回覆單 → 轉介北投／轉介他院／暫不轉介</small></div>
+      <div class="eff-v79-section-heading"><div><span>優化計畫衛生局處置效率</span><h3>衛生局回覆與轉介</h3></div><small>通報轉介單 → 衛生局回覆單 → 轉介北投／轉介松德院區／暫不轉介</small></div>
 
       <article class="eff-v83-routing-card">
         <div class="eff-v83-routing-head">
@@ -12427,14 +12427,14 @@
           <i class="eff-v83-flow-arrow">→</i>
           <div class="eff-v83-routing-results">
             <div class="beitou"><span>轉介三總北投</span><strong data-eff-value="bureauToHospital">41.6</strong><em>%</em><small>208 件</small></div>
-            <div class="other"><span>轉介他院</span><strong data-eff-computed="otherReferral">16.6</strong><em>%</em><small>83 件</small></div>
+            <div class="other"><span>轉介松德院區</span><strong data-eff-computed="otherReferral">16.6</strong><em>%</em><small>83 件</small></div>
             <div class="hold"><span>暫不轉介</span><strong data-eff-value="nonReferralRate">41.8</strong><em>%</em><small>209 件</small></div>
           </div>
         </div>
       </article>
 
       <div class="eff-v83-bureau-rate-grid eff-v86-bureau-rate-4">
-        <article class="eff-v86-flagged"><span>衛生局醫療轉介率</span><strong data-eff-value="bureauReferral">58.2</strong><em>%</em><small>轉介醫療機構 ÷ 已完成回覆單<b class="eff-v86-flag" title="分母定義待確認，詳見指標說明">定義待確認</b></small><button class="eff-v79-info" data-metric="衛生局醫療轉介率">i</button></article>
+        <article><span>衛生局醫療轉介率</span><strong data-eff-value="bureauReferral">58.2</strong><em>%</em><small>轉介醫療機構 ÷ 已完成回覆單</small><button class="eff-v79-info" data-metric="衛生局醫療轉介率">i</button></article>
         <article><span>衛生局轉介本院率</span><strong data-eff-value="bureauToHospital">41.6</strong><em>%</em><small>轉介北投 ÷ 已完成回覆單</small><button class="eff-v79-info" data-metric="衛生局轉介本院率">i</button></article>
         <article><span>本院醫療轉介占率</span><strong data-eff-value="hospitalShare">71.5</strong><em>%</em><small>轉介北投 ÷ 衛生局轉介醫療機構案件數</small><button class="eff-v79-info" data-metric="本院醫療轉介占率">i</button></article>
         <article><span>衛生局暫不轉介率</span><strong data-eff-value="nonReferralRate">41.8</strong><em>%</em><small>暫不轉介 ÷ 已完成回覆單</small><button class="eff-v79-info" data-metric="衛生局暫不轉介率">i</button></article>
@@ -12992,12 +12992,12 @@
             <strong data-v9-rate="referral">52.3%</strong>
             <div class="hospital-his-detail" data-v9-count="referral">任一項有轉介 90 / 172 人</div>
             <div class="hospital-his-bar"><i data-v9-bar="referral" style="width:52.3%"></i></div>
-            <!-- 結案訪視紀錄單「醫療資源轉介」的四個選項；選項名稱待確認，改這裡即可 -->
+            <!-- 結案訪視紀錄單「醫療資源轉介」的四個選項（V9 追加確認：醫療資源、社區支持資源、社區心理衛生中心、EIP計畫） -->
             <ul class="v9-referral-split" title="四項各自的轉介人數 ÷ 收案總人數（一人可勾多項）">
-              <li data-v9-option="opd" title="門診：68 / 172 人"><span>門診</span><b>39.5%</b></li>
-              <li data-v9-option="ipd" title="住院：17 / 172 人"><span>住院</span><b>9.9%</b></li>
-              <li data-v9-option="home" title="居家治療：20 / 172 人"><span>居家治療</span><b>11.6%</b></li>
-              <li data-v9-option="day" title="日間留院：8 / 172 人"><span>日間留院</span><b>4.7%</b></li>
+              <li data-v9-option="medical" title="醫療資源：68 / 172 人"><span>醫療資源</span><b>39.5%</b></li>
+              <li data-v9-option="community" title="社區支持資源：20 / 172 人"><span>社區支持資源</span><b>11.6%</b></li>
+              <li data-v9-option="cmhc" title="社區心理衛生中心：17 / 172 人"><span>社區心理衛生中心</span><b>9.9%</b></li>
+              <li data-v9-option="eip" title="EIP計畫：8 / 172 人"><span>EIP計畫</span><b>4.7%</b></li>
             </ul>
           </article>
 
@@ -16274,7 +16274,7 @@ document.addEventListener('DOMContentLoaded', () => {
       {reason:'門診 / 居家治療', count:10},
       {reason:'拒絕接受服務（已依拒訪SOP處理）', count:9},
       {reason:'拒訪', count:7},
-      {reason:'未轉介 / 轉介他院', count:6},
+      {reason:'未轉介', count:6},
       {reason:'搬遷', count:5},
       {reason:'失聯（已依失聯SOP處理）', count:4},
       {reason:'羈押中', count:3},
@@ -16638,7 +16638,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="v9-formula-group">優化計畫專屬指標<span>平台資料，只算優化計畫個案</span></div>
       <div class="hospital-his-formula">
         <b>疑似或社區精神病人照護優化計畫結案個案轉介率</b>
-        <span>（結案個案轉介資源人數 ÷ 收案總人數）×100%。依結案訪視紀錄單「醫療資源轉介」的四個選項：任一項有轉介就計入分子；四項另各自計算（該項轉介人數 ÷ 收案總人數），一人可勾多項，四項相加會超過「任一項」</span>
+        <span>（結案個案轉介資源人數 ÷ 收案總人數）×100%。依結案訪視紀錄單「醫療資源轉介」的四個選項（醫療資源、社區支持資源、社區心理衛生中心、EIP計畫）：任一項有轉介就計入分子；四項另各自計算（該項轉介人數 ÷ 收案總人數），一人可勾多項，四項相加會超過「任一項」</span>
       </div>
       <div class="hospital-his-formula">
         <b>疑似或社區精神病人照護優化計畫機構結案失聯率</b>
@@ -17554,9 +17554,9 @@ document.addEventListener('DOMContentLoaded',()=>{
       '緊醫出勤準備時間':'醫療實際出勤時間（「出勤單」中填寫的出勤年、月、日、時間），減掉「系統」上首次完成「受理方式」表單的時間。',
       '緊醫電話受理總反應時間':'受理方式為「電話諮詢」的案件：「系統」首次完成「受理方式」表單的時間，減掉「系統」網絡通報完成時間（＝通報後派案時間＋首次專業評估時間，不含出勤準備）。',
       '緊醫出勤總反應時間':'醫療實際出勤時間（「出勤單」中填寫的出勤年、月、日、時間），減掉「系統」網絡通報完成時間。',
-      '衛生局醫療轉介率':'轉介醫療機構案件數（即衛生局優化計畫回覆單中勾選「轉介」的案件數） / 衛生局完成回覆單案件數。　※ 定義待確認：分母若採「所有轉介案」，依此公式算出來會固定是 100%，需與需求端確認分母應為「衛生局完成回覆單案件數」或「所有轉介案」。目前畫面以前者計算。',
+      '衛生局醫療轉介率':'轉介醫療機構案件數（即衛生局優化計畫回覆單中勾選「轉介三總北投」或「轉介松德院區」的案件數） / 衛生局完成回覆單案件數。',
       '衛生局轉介本院率':'轉介三總北投案件數（即衛生局優化計畫回覆單中勾選「轉介三總北投」的案件數） / 衛生局完成回覆單案件數。',
-      '本院醫療轉介占率':'轉介三總北投案件數（即衛生局優化計畫回覆單中勾選「轉介三總北投」的案件數） / 衛生局轉介醫療機構案件數。',
+      '本院醫療轉介占率':'轉介三總北投案件數（即衛生局優化計畫回覆單中勾選「轉介三總北投」的案件數） / 衛生局轉介醫療機構案件數（轉介三總北投＋轉介松德院區）。',
       '衛生局暫不轉介率':'暫不轉介案件數（衛生局優化計畫回覆單勾選「暫不轉介」） / 衛生局完成回覆單案件數。',
       '暫不轉介原因分布':'各暫不轉介原因案件數 / 衛生局暫不轉介案件數。原因包含：社區心衛中心個管服務對象、已住院/門診/居家治療、另行收案、非衛生機關之服務項目、不符合轉介目的、拒訪、資料不足、其他原因。',
       '衛生局訪視時間':'衛生局填寫在優化計畫「回覆單」中的「訪視日期」，減掉「系統」網絡完成通報時間。',
@@ -22577,7 +22577,8 @@ img{ max-width:100%; height:auto; }
 #efficiency .eff-v86-bureau-rate-4 article:nth-child(4)>strong{ color:#d97945; }
 
 /* 定義待確認的標記：CSV 對此指標註記「分母應該是所有轉介案，
-   不然轉介率照上面的公式算出來會是 100%」 */
+   不然轉介率照上面的公式算出來會是 100%」
+   V9 追加：客戶確認分母為已完成回覆單，衛生局醫療轉介率卡片已拿掉標記；樣式保留，之後有待確認的指標可再用 */
 #efficiency .eff-v86-flagged{ border-color:#f0d9a8 !important; }
 /* 內嵌在說明文字行內，不額外增加卡片高度——
    這一列的高度預算已經是滿的，多 16px 就會把下方區塊擠出面板 */
@@ -25093,28 +25094,31 @@ html body .dashboard #hospital.page .hospital-his-card.delta.v9-bad .hospital-hi
 html body .dashboard #hospital.page .hospital-his-card.delta.v9-neutral > strong{ color:#218fee !important; }
 html body .dashboard #hospital.page .hospital-his-card.delta.v9-neutral .hospital-his-trend{ color:#526071 !important; }
 
-/* 轉介率的四個選項：兩欄小格，數字是該項人數 ÷ 收案總人數 */
+/* 轉介率的四個選項：數字是該項人數 ÷ 收案總人數。
+   V9 追加改成正式名稱後最長 8 個字（社區心理衛生中心），原本的兩欄小格在 1200–1920px 都會被截斷 → 一列一項。
+   這張卡的高度決定整列卡片的高度（1536×730 已經滿了），所以不畫進度條，由四項明細取代，卡片高度不變 */
+html body .dashboard #hospital.page .v9-referral-card .hospital-his-bar{ display:none !important; }
 html body .dashboard #hospital.page .v9-referral-split{
   list-style:none;
-  margin:7px 0 0;
+  margin:4px 0 0;
   padding:0;
   display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:4px 6px;
+  grid-template-columns:minmax(0,1fr);
+  gap:1px;
 }
 html body .dashboard #hospital.page .v9-referral-split li{
   min-width:0;
   display:flex;
   align-items:baseline;
   justify-content:space-between;
-  gap:6px;
+  gap:8px;
   margin:0;
-  padding:1px 8px;
-  border-radius:6px;
+  padding:0 8px;
+  border-radius:4px;
   background:#eef5fd;
   color:#526071;
   font-size:12px;
-  line-height:1.55;
+  line-height:1.24;
 }
 html body .dashboard #hospital.page .v9-referral-split li span{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 html body .dashboard #hospital.page .v9-referral-split li b{ color:#1f7fd6; font-weight:700; white-space:nowrap; }
@@ -25243,7 +25247,8 @@ html body .dashboard #hospital.page .v9-scope-card .hospital-his-info-btn:hover{
   const ADMITTED = 172;
   /* 本年度的比率（%）。轉介率四項的分母同樣是收案總人數；一人可勾多項，四項相加會超過「任一項」 */
   const RATES = { referral:52.3, lost:5.8, refused:4.1 };
-  const REFERRAL_OPTIONS = { opd:39.5, ipd:9.9, home:11.6, day:4.7 };   /* 選項名稱寫在 HTML 的 .v9-referral-split（待確認） */
+  /* 四項的名稱寫在 HTML 的 .v9-referral-split（V9 追加確認：醫療資源、社區支持資源、社區心理衛生中心、EIP計畫） */
+  const REFERRAL_OPTIONS = { medical:39.5, community:11.6, cmhc:9.9, eip:4.7 };
   /* better：'down' 越少越好、'up' 越多越好、null 只描述增減不判斷好壞（門診次數增減的好壞沒有定義） */
   const DELTAS = {
     monthlyOpd:{ unit:'次 / 月', digits:1, better:null, values:{ optimization:-0.68 },

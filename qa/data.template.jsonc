@@ -1,0 +1,157 @@
+// =============================================================================
+// qa/data.json 範本（schemaVersion 2）
+// -----------------------------------------------------------------------------
+// 給平台專案產生 qa/data.json 用：欄位意義寫在註解，規則與代碼表見同資料夾 DATA_CONTRACT.md。
+// ・實際檔案輸出「標準 JSON」：不要註解、不要結尾逗號（儀表板讀得懂註解，驗證工具不一定）。
+// ・醫院內控指標（SNQ）與指揮儀表板「平台使用率」不在這個檔，在 data-platform.json。
+// ・每次都是全量快照：emg、opt 放平台上「全部」通報，不限日期、不做增量。
+// ・沒有的值給 null；陣列沒有資料給 []；整塊還沒有資料（例如還沒接 HIS）的子物件給 null。
+// ・時間 YYYY-MM-DDTHH:mm:ss（不帶時區＝臺北時間）；日期 YYYY-MM-DD。
+// ・★ 是還沒跟平台確認的地方，問題清單在 DATA_CONTRACT.md 第 6 節。
+// ・平台起始日固定 2026/10/05（寫在儀表板裡，不用給）；早於這天的通報儀表板不列入。
+//   這份範本的 updatedAt 假設在 2027/09/30，結案後 3／6 個月追蹤等欄位才有值可以示範。
+// =============================================================================
+{
+  "schemaVersion": 2,                          // 必填：固定 2（prod 還在用 1，見 DATA_CONTRACT.md 第 1 節）
+  "updatedAt": "2027-09-30T06:00:05+08:00",    // 必填：撈資料的時間，帶 +08:00。頁首「資料更新」；本日／本月／本季／本年度以它的日期為基準
+
+  // ---------------------------------------------------------------------------
+  // 緊急醫療通報：一筆通報一個物件
+  // ---------------------------------------------------------------------------
+  "emg": [
+    {
+      "reportId": "20261018101530",            // 必填：通報識別碼，唯一、不會變
+      "reporterDepartment": 3,                 // ★ 通報者所屬網絡代碼（暫定 0 社政、1 警察、2 民政、3 衛政、4 教育、5 消防、6 勞政、8 其他）
+      "caseInfo": {
+        "county": "臺北市",                    // 縣市全名（台／臺都可以）；沒給時對得到臺北市 12 區的才算臺北市
+        "dict": "北投",                        // 行政區：「北投」「北投區」「新北市板橋區」都可以
+        "longitude": 121.501,                  // WGS84 經度；建議四捨五入到小數 3 位（約 100 公尺）
+        "latitude": 25.132,                    // WGS84 緯度
+        "gender": 20,                          // 10 男、20 女，其他算「不明」
+        "age": 52                              // 通報當時年齡（不要給生日）
+      },
+      "assess": {                              // 初評量表「等級」：0 輕度／低風險、1 中、2 重度／高風險、3 其他（不列入統計）
+        "CTRS": 1,                             // 風險檢傷評估；同時當作「初評風險」（效率頁、地圖顏色）★
+        "GAF": 2,
+        "BSRS5": 0,
+        "CGIS": 1
+      },
+      "acceptWay": 1,                          // 受理方式：0 電話、1 電話＋出勤；還沒完成為 null
+      "timePoint": {
+        "reportedAt": "2026-10-18T10:15:30",   // 必填：網絡完成通報。所有日期篩選與時效指標的起點
+        "assignedAt": "2026-10-18T10:26:41",   // 完成指派醫師／護理師；未指派 null
+        "acceptedAt": "2026-10-18T11:40:02",   // 首次完成「受理方式」表單（＝處理完成）
+        "outsideAt": "2026-10-19T14:00:00",    // 出勤單上填的實際出勤時間；沒有出勤 null
+        "closedAt": "2026-10-26T09:30:00"      // v2 新增：結案時間；未結案 null
+      },
+      "status": 1,                             // 0 未結案（再依 assignedAt 分待派／已派）、1 已結案、2 未轉介／開案
+      "StatisfactionAvg": 4.5,                 // 滿意度平均分 1–5；未填 null（寫成 SatisfactionAvg 也可以）
+
+      // ---- 以下 v2 新增，emg 與 opt 共用；還沒有資料的整塊給 null ----
+      "scores": {                              // 量表「原始分數」（精神症狀改善成效 → 改善情況、個案明細）
+        "initial": { "CTRS": 9, "GAF": 48, "BSRS5": 13, "CGIS": 5 },   // 初評
+        "m3": { "CTRS": 7, "GAF": 55, "BSRS5": 9, "CGIS": 4 },         // 結案後 3 個月追蹤量表；沒有 null
+        "m6": null                                                     // 結案後 6 個月追蹤量表；沒有 null
+      },
+      "followUp": {                            // 結案後追蹤量表填寫狀況（精神症狀改善成效 → 評估表填寫狀況）
+        "m3": "trackable",                     // null＝還沒到應回收時間；"notReturned" 應回收未回收；"trackable" 回收且有分數；"unable" 回收但勾選無法填答
+        "m6": "notReturned"                    // 這例：結案滿 6 個月、問卷還沒回收（scores.m6 因此是 null）
+      },
+      "his": {                                 // HIS 比對結果（已結案個案；身分證比對在平台專案做完，檔案裡不放身分證）
+        "ipdBefore": 1,                        // 收案／開案時過去一年精神科住院次數
+        "opdBefore": 2,                        // 收案／開案時過去一年精神科門診次數
+        "ipdAfter": 0,                         // 結案後住院次數
+        "psyOpdAfter": 4,                      // 結案後身心科門診使用次數
+        "homeOpdAfter": 1                      // 結案後居家照護科門診使用次數
+      },
+      "ai": {                                  // AI 模型預測（AI模型預測準確率）；沒有預測 null
+        "predicted": 9,                        // AI 模型預測分數（3–15）
+        "actual": 10,                          // 專業人員實測分數（3–15）；還沒評估 null
+        "modelVersion": "1.2"                  // 預測時用的模型版本（吻合程度變化依版本累積）
+      }
+    }
+  ],
+
+  // ---------------------------------------------------------------------------
+  // 優化計畫轉介：一筆轉介一個物件
+  // ---------------------------------------------------------------------------
+  "opt": [
+    {
+      // 例一：衛生局轉介三總北投 → 開案 → 結案
+      "reportId": "OPT20261012091200",         // 必填：唯一、不會變（不要跟 emg 的 reportId 重複）
+      "optType": 1,                            // 必填：1 第一類、2 第二類、3 第三類優化計畫
+      "reporterDepartment": 0,
+      "caseInfo": { "county": "臺北市", "dict": "萬華區", "longitude": 121.498, "latitude": 25.034, "gender": 10, "age": 41 },
+      "assess": { "CTRS": 2, "GAF": 2, "BSRS5": 2, "CGIS": 2 },
+      "timePoint": {
+        "reportedAt": "2026-10-12T09:12:00",   // 必填：網絡完成通報（轉介單送出）
+        "bureauRepliedAt": "2026-10-13T16:20:00",   // 衛生局完成優化計畫回覆單（系統時間）
+        "reviewedAt": null,                    // 本院完成不轉介覆核單（只有暫不轉介的案件有）
+        "assignedAt": "2026-10-14T09:05:00",   // 完成指派醫師／護理師
+        "hospitalRepliedAt": "2026-10-18T17:30:00", // 完成醫療機構回覆單（系統時間）
+        "firstVisitAt": "2026-10-17T14:00:00", // 評估階段訪視紀錄單「訪視日期時間-開始」（第一次訪視）
+        "closedAt": "2027-01-20T11:00:00"      // 結案
+      },
+      "status": 1,
+      "StatisfactionAvg": 5.0,
+      "bureau": {                              // 衛生局優化計畫回覆單；還沒回覆整塊 null
+        "result": 1,                           // 1 轉介三總北投、2 轉介松德院區、3 暫不轉介（不會轉介他院）
+        "noReferralReason": null,              // 暫不轉介原因（回覆單上的選項文字）
+        "visitDate": "2026-10-13",             // 回覆單填寫的「訪視日期」
+        "dispatchDate": "2026-10-13"           // 回覆單填寫的「派案日期」
+      },
+      "review": null,                          // 不轉介覆核單：{ "result": 1 同意 | 2 駁回 }；沒有覆核 null
+      "hospital": {                            // 醫療機構回覆單；還沒回覆整塊 null
+        "opened": true,                        // true 開案、false 無法收案
+        "unableReason": null,                  // 無法收案原因（回覆單上的選項文字，例如「住院」「拒訪」「未轉介」）
+        "contactAt": "2026-10-14T15:30:00"     // 回覆單填寫的「進行聯繫時間」
+      },
+      "monthlyUse": {                          // 每月使用門診／急診次數（訪視紀錄單）
+        "first": { "opd": 2, "er": 1 },        // 第一次評估訪視
+        "closing": { "opd": 1, "er": 0 }       // 結案訪視；還沒結案 null
+      },
+      "closing": {                             // 結案訪視紀錄單；還沒結案整塊 null
+        "reason": "服務已達3個月",              // 結案原因（選項文字，只做顯示）
+        "lostContact": false,                  // ★ 未完成處遇即失聯（結案失聯率的分子）
+        "refused": false,                      // ★ 未完成處遇即拒訪（結案拒訪率的分子）
+        "referrals": [1, 3]                    // 醫療資源轉介勾選的選項代碼：1 醫療資源、2 社區支持資源、3 社區心理衛生中心、4 EIP計畫；沒有轉介 []
+      },
+      "scores": {
+        "initial": { "CTRS": 11, "GAF": 38, "BSRS5": 16, "CGIS": 6 },
+        "m3": { "CTRS": 8, "GAF": 47, "BSRS5": 11, "CGIS": 5 },
+        "m6": { "CTRS": 7, "GAF": 52, "BSRS5": 9, "CGIS": 4 }
+      },
+      "followUp": { "m3": "trackable", "m6": "trackable" },
+      "his": { "ipdBefore": 2, "opdBefore": 4, "ipdAfter": 1, "psyOpdAfter": 6, "homeOpdAfter": 2 },
+      "ai": { "predicted": 12, "actual": 11, "modelVersion": "1.2" }
+    },
+    {
+      // 例二：衛生局暫不轉介 → 本院覆核駁回後仍開案（暫不轉介案件醫療介入）→ 尚未結案
+      "reportId": "OPT20270920143300",
+      "optType": 2,
+      "reporterDepartment": 1,
+      "caseInfo": { "county": "臺北市", "dict": "士林", "longitude": null, "latitude": null, "gender": 20, "age": 67 },
+      "assess": { "CTRS": 0, "GAF": 1, "BSRS5": 1, "CGIS": 0 },
+      "timePoint": {
+        "reportedAt": "2027-09-20T14:33:00",
+        "bureauRepliedAt": "2027-09-22T10:00:00",
+        "reviewedAt": "2027-09-23T09:40:00",
+        "assignedAt": "2027-09-23T11:00:00",
+        "hospitalRepliedAt": null,
+        "firstVisitAt": "2027-09-28T10:30:00",
+        "closedAt": null
+      },
+      "status": 0,
+      "StatisfactionAvg": null,
+      "bureau": { "result": 3, "noReferralReason": "個案拒絕醫療服務", "visitDate": "2027-09-21", "dispatchDate": null },
+      "review": { "result": 2 },
+      "hospital": { "opened": true, "unableReason": null, "contactAt": "2027-09-23T14:10:00" },
+      "monthlyUse": { "first": { "opd": 0, "er": 2 }, "closing": null },
+      "closing": null,
+      "scores": { "initial": { "CTRS": 6, "GAF": 58, "BSRS5": 8, "CGIS": 3 }, "m3": null, "m6": null },
+      "followUp": { "m3": null, "m6": null },
+      "his": null,
+      "ai": { "predicted": 7, "actual": null, "modelVersion": "1.3" }
+    }
+  ]
+}

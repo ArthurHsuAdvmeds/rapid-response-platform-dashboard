@@ -7,6 +7,7 @@
 - 資料檔：`prod/data.json`（與 `prod/index.html` 同層；儀表板只讀這一個檔）
 - 格式版本：`schemaVersion: 1`（2026-11-09 訂）
 - 標 ★ 的是還沒確認的地方，問題集中在第 5 節。
+- **下一版**：qa 驗證中的新格式（schemaVersion 2：加上優化計畫、量表分數、HIS 比對，另有 `data-platform.json`）見 [../qa/DATA_CONTRACT.md](../qa/DATA_CONTRACT.md)；qa 驗證通過後 prod 換成那份規格。
 
 ---
 

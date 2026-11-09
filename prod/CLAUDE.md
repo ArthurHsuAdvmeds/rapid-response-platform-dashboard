@@ -7,6 +7,7 @@
 - **`data.json` 的格式、排程要遵守的事、待確認問題，全部以 [DATA_CONTRACT.md](DATA_CONTRACT.md) 為準。** 本文件只記儀表板端。
 - `data.json` 屬於排程主機（另一個專案），它定期全量產生並 push。**不要手動改、不要 commit 測試資料進去**；測別的資料見第 4 節。
 - repo 與 Pages 都是公開的，上線前要先決定資料怎麼保護：見 DATA_CONTRACT.md 第 0 節。
+- 下一版在 [../qa/](../qa/CLAUDE.md)（V9 全部頁面接資料、新格式 schemaVersion 2），驗證通過後整份換到這裡；在那之前 prod 只做必要的修正。
 - 目前的 `data.json` 是使用者提供的 14 筆（通報日 2026/10/05–11/03），還是舊格式（沒有 `schemaVersion`、`updatedAt` 只有日期）；儀表板相容，排程第一次執行就會換成新格式。
 
 ---
