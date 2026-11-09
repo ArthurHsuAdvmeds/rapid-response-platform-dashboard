@@ -1,0 +1,369 @@
+{
+    "updatedAt": "2026-11-03",
+    "emg": [
+        {
+            "reportId": "20261005121819",
+            "reporterDepartment": 8,
+            "caseInfo": {
+                "dict": "北投",
+                "longitude": 121.51407,
+                "latitude": 25.11828,
+                "gender": 20,
+                "age": 76
+            },
+            "assess": {
+                "CTRS": 0,
+                "GAF": 2,
+                "BSRS5": 1,
+                "CGIS": 2
+            },
+            "acceptWay": 1,
+            "timePoint": {
+                "reportedAt": "2026-10-05T12:18:19",
+                "assignedAt": "2026-10-05T12:18:53",
+                "acceptedAt": "2026-10-05T14:22:45",
+                "outsideAt": "2026-10-08T19:33:33"
+            },
+            "status": 1,
+            "StatisfactionAvg": 5.0
+        },
+        {
+            "reportId": "20261007080725",
+            "reporterDepartment": 3,
+            "caseInfo": {
+                "dict": "萬華",
+                "longitude": 121.50855,
+                "latitude": 25.023617,
+                "gender": 10,
+                "age": 48
+            },
+            "assess": {
+                "CTRS": 0,
+                "GAF": 2,
+                "BSRS5": 2,
+                "CGIS": 2
+            },
+            "acceptWay": 0,
+            "timePoint": {
+                "reportedAt": "2026-10-07T08:07:25",
+                "assignedAt": "2026-10-07T08:25:15",
+                "acceptedAt": "2026-10-07T08:26:25",
+                "outsideAt": null
+            },
+            "status": 1,
+            "StatisfactionAvg": 5.0
+        },
+        {
+            "reportId": "20261007161151",
+            "reporterDepartment": 0,
+            "caseInfo": {
+                "dict": "大安",
+                "longitude": 121.54498,
+                "latitude": 25.027847,
+                "gender": 20,
+                "age": 38
+            },
+            "assess": {
+                "CTRS": 0,
+                "GAF": 2,
+                "BSRS5": 2,
+                "CGIS": 1
+            },
+            "acceptWay": 1,
+            "timePoint": {
+                "reportedAt": "2026-10-07T16:11:51",
+                "assignedAt": "2026-10-07T16:17:41",
+                "acceptedAt": "2026-10-07T17:42:07",
+                "outsideAt": "2026-10-09T10:02:22"
+            },
+            "status": 1,
+            "StatisfactionAvg": 5.0
+        },
+        {
+            "reportId": "20261008090911",
+            "reporterDepartment": 3,
+            "caseInfo": {
+                "dict": "萬華",
+                "longitude": 121.506355,
+                "latitude": 25.046982,
+                "gender": 20,
+                "age": 61
+            },
+            "assess": {
+                "CTRS": 0,
+                "GAF": 1,
+                "BSRS5": 0,
+                "CGIS": 1
+            },
+            "acceptWay": 1,
+            "timePoint": {
+                "reportedAt": "2026-10-08T09:09:11",
+                "assignedAt": "2026-10-08T09:11:24",
+                "acceptedAt": "2026-10-08T17:27:22",
+                "outsideAt": "2026-10-13T09:43:46"
+            },
+            "status": 1,
+            "StatisfactionAvg": 5.0
+        },
+        {
+            "reportId": "20261021151056",
+            "reporterDepartment": 3,
+            "caseInfo": {
+                "dict": "士林",
+                "longitude": 121.51773,
+                "latitude": 25.083933,
+                "gender": 20,
+                "age": 75
+            },
+            "assess": {
+                "CTRS": 0,
+                "GAF": 1,
+                "BSRS5": 0,
+                "CGIS": 0
+            },
+            "acceptWay": 1,
+            "timePoint": {
+                "reportedAt": "2026-10-21T15:10:56",
+                "assignedAt": "2026-10-21T15:15:51",
+                "acceptedAt": "2026-10-21T15:36:55",
+                "outsideAt": "2026-10-22T10:14:57"
+            },
+            "status": 1,
+            "StatisfactionAvg": 5.0
+        },
+        {
+            "reportId": "20261021161612",
+            "reporterDepartment": 3,
+            "caseInfo": {
+                "dict": null,
+                "longitude": null,
+                "latitude": null,
+                "gender": 10,
+                "age": 47
+            },
+            "assess": {
+                "CTRS": 2,
+                "GAF": 2,
+                "BSRS5": 0,
+                "CGIS": 1
+            },
+            "acceptWay": 1,
+            "timePoint": {
+                "reportedAt": "2026-10-21T16:16:12",
+                "assignedAt": "2026-10-21T16:23:46",
+                "acceptedAt": "2026-10-22T03:00:38",
+                "outsideAt": "2026-10-27T11:19:46"
+            },
+            "status": 1,
+            "StatisfactionAvg": null
+        },
+        {
+            "reportId": "20261021162325",
+            "reporterDepartment": 3,
+            "caseInfo": {
+                "dict": "中正",
+                "longitude": 121.52177,
+                "latitude": 25.028881,
+                "gender": 20,
+                "age": 79
+            },
+            "assess": {
+                "CTRS": 1,
+                "GAF": 1,
+                "BSRS5": 2,
+                "CGIS": 1
+            },
+            "acceptWay": 1,
+            "timePoint": {
+                "reportedAt": "2026-10-21T16:23:25",
+                "assignedAt": "2026-10-21T16:25:59",
+                "acceptedAt": "2026-10-21T17:27:59",
+                "outsideAt": "2026-10-23T13:31:57"
+            },
+            "status": 1,
+            "StatisfactionAvg": null
+        },
+        {
+            "reportId": "20261029190709",
+            "reporterDepartment": 3,
+            "caseInfo": {
+                "dict": "北投",
+                "longitude": null,
+                "latitude": null,
+                "gender": 10,
+                "age": 56
+            },
+            "assess": {
+                "CTRS": 2,
+                "GAF": 2,
+                "BSRS5": 2,
+                "CGIS": 2
+            },
+            "acceptWay": 1,
+            "timePoint": {
+                "reportedAt": "2026-10-29T19:07:09",
+                "assignedAt": "2026-10-29T19:19:47",
+                "acceptedAt": "2026-10-30T10:27:18",
+                "outsideAt": "2026-10-30T12:21:16"
+            },
+            "status": 1,
+            "StatisfactionAvg": 5.0
+        },
+        {
+            "reportId": "20261029193400",
+            "reporterDepartment": 0,
+            "caseInfo": {
+                "dict": "大安",
+                "longitude": 121.54498,
+                "latitude": 25.027847,
+                "gender": 20,
+                "age": 38
+            },
+            "assess": {
+                "CTRS": 1,
+                "GAF": 1,
+                "BSRS5": 2,
+                "CGIS": 2
+            },
+            "acceptWay": 1,
+            "timePoint": {
+                "reportedAt": "2026-10-29T19:34:00",
+                "assignedAt": "2026-10-29T19:39:38",
+                "acceptedAt": "2026-10-30T16:59:51",
+                "outsideAt": "2026-10-31T10:37:01"
+            },
+            "status": 1,
+            "StatisfactionAvg": 5.0
+        },
+        {
+            "reportId": "20261030152121",
+            "reporterDepartment": 3,
+            "caseInfo": {
+                "dict": null,
+                "longitude": null,
+                "latitude": null,
+                "gender": 20,
+                "age": null
+            },
+            "assess": {
+                "CTRS": 2,
+                "GAF": null,
+                "BSRS5": null,
+                "CGIS": null
+            },
+            "acceptWay": null,
+            "timePoint": {
+                "reportedAt": "2026-10-30T15:21:21",
+                "assignedAt": null,
+                "acceptedAt": null,
+                "outsideAt": null
+            },
+            "status": 0,
+            "StatisfactionAvg": null
+        },
+        {
+            "reportId": "20261030154755",
+            "reporterDepartment": 3,
+            "caseInfo": {
+                "dict": "北投",
+                "longitude": 121.50695,
+                "latitude": 25.134512,
+                "gender": 20,
+                "age": null
+            },
+            "assess": {
+                "CTRS": 1,
+                "GAF": 1,
+                "BSRS5": 2,
+                "CGIS": 2
+            },
+            "acceptWay": 1,
+            "timePoint": {
+                "reportedAt": "2026-10-30T15:47:55",
+                "assignedAt": "2026-10-30T16:03:30",
+                "acceptedAt": "2026-10-31T10:01:33",
+                "outsideAt": null
+            },
+            "status": 0,
+            "StatisfactionAvg": null
+        },
+        {
+            "reportId": "20261102101714",
+            "reporterDepartment": 3,
+            "caseInfo": {
+                "dict": "萬華",
+                "longitude": 121.5035,
+                "latitude": 25.025322,
+                "gender": 10,
+                "age": 79
+            },
+            "assess": {
+                "CTRS": 0,
+                "GAF": 2,
+                "BSRS5": 1,
+                "CGIS": 0
+            },
+            "acceptWay": null,
+            "timePoint": {
+                "reportedAt": "2026-11-02T10:17:14",
+                "assignedAt": "2026-11-02T10:26:17",
+                "acceptedAt": null,
+                "outsideAt": null
+            },
+            "status": 0,
+            "StatisfactionAvg": null
+        },
+        {
+            "reportId": "20261102162101",
+            "reporterDepartment": 3,
+            "caseInfo": {
+                "dict": "萬華",
+                "longitude": 121.49631,
+                "latitude": 25.025925,
+                "gender": 10,
+                "age": 52
+            },
+            "assess": {
+                "CTRS": 1,
+                "GAF": 1,
+                "BSRS5": 0,
+                "CGIS": 1
+            },
+            "acceptWay": 1,
+            "timePoint": {
+                "reportedAt": "2026-11-02T16:21:01",
+                "assignedAt": "2026-11-02T16:36:11",
+                "acceptedAt": "2026-11-02T23:00:07",
+                "outsideAt": null
+            },
+            "status": 0,
+            "StatisfactionAvg": null
+        },
+        {
+            "reportId": "20261103085037",
+            "reporterDepartment": 3,
+            "caseInfo": {
+                "dict": "萬華",
+                "longitude": 121.50762,
+                "latitude": 25.025963,
+                "gender": 20,
+                "age": 35
+            },
+            "assess": {
+                "CTRS": 1,
+                "GAF": 2,
+                "BSRS5": 0,
+                "CGIS": 0
+            },
+            "acceptWay": null,
+            "timePoint": {
+                "reportedAt": "2026-11-03T08:50:37",
+                "assignedAt": "2026-11-03T10:49:03",
+                "acceptedAt": null,
+                "outsideAt": null
+            },
+            "status": 0,
+            "StatisfactionAvg": null
+        }
+    ]
+}

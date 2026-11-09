@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>三軍總醫院北投分院｜精神健康個案通報管理儀表板｜版本說明</title>
+<style>
+:root{
+  --bg:#f6f2ee;
+  --card:#ffffff;
+  --ink:#2e2320;
+  --ink-2:#6b564b;
+  --ink-3:#9b8378;
+  --line:#e9ddd3;
+  --line-2:#f2e8e0;
+  --accent:#bd4a32;
+  --accent-soft:#fdf0ea;
+  --navy:#20303f;
+  --high:#e4573f;
+  --medium:#e08a26;
+  --low:#dcb43a;
+  --green:#2f855a;
+  --green-soft:#e8f4ed;
+  --radius:14px;
+  --shadow:0 1px 2px rgba(46,35,32,.04),0 8px 24px rgba(46,35,32,.06);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:15px;
+  line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px 80px}
+
+/* ---------- 頁首 ---------- */
+.masthead{
+  background:linear-gradient(180deg,#fffaf6 0%,var(--bg) 100%);
+  border-bottom:1px solid var(--line);
+  padding:42px 0 30px;
+  margin-bottom:34px;
+}
+.masthead .wrap{padding-bottom:0}
+.eyebrow{
+  display:inline-block;
+  font-size:11px;
+  letter-spacing:.14em;
+  color:var(--accent);
+  background:var(--accent-soft);
+  border:1px solid #f6ddd2;
+  border-radius:999px;
+  padding:4px 12px;
+  margin-bottom:14px;
+}
+h1{
+  margin:0 0 8px;
+  font-size:28px;
+  line-height:1.35;
+  letter-spacing:.01em;
+}
+.lede{margin:0;color:var(--ink-2);max-width:62ch;font-size:14.5px}
+
+/* ---------- 版本入口 ---------- */
+.entries{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  gap:10px;
+  margin-top:24px;
+}
+.entry{
+  display:block;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:13px 15px;
+  box-shadow:var(--shadow);
+  transition:border-color .14s ease,transform .14s ease;
+}
+.entry:hover{border-color:#e0b4a3;transform:translateY(-1px);text-decoration:none}
+.entry b{display:block;font-size:15px;color:var(--ink)}
+.entry span{display:block;font-size:11.5px;color:var(--ink-3);margin-top:1px}
+.entry.current b::after{
+  content:"最新";
+  margin-left:7px;
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.06em;
+  color:#fff;
+  background:var(--accent);
+  border-radius:4px;
+  padding:1px 6px;
+  vertical-align:2px;
+}
+
+/* ---------- 閱讀說明 ---------- */
+.howto{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-left:3px solid var(--accent);
+  border-radius:10px;
+  padding:14px 18px;
+  margin:26px 0 40px;
+  font-size:13.5px;
+  color:var(--ink-2);
+}
+.howto strong{color:var(--ink)}
+
+/* ---------- 版本區塊 ---------- */
+.release{margin-bottom:46px}
+.release-head{
+  display:flex;
+  align-items:baseline;
+  flex-wrap:wrap;
+  gap:10px 14px;
+  padding-bottom:12px;
+  border-bottom:2px solid var(--line);
+  margin-bottom:22px;
+}
+.release-ver{
+  font-size:23px;
+  font-weight:700;
+  letter-spacing:.02em;
+  margin:0;
+}
+.release-date{font-size:12.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.release-vs{
+  font-size:12px;
+  color:var(--ink-2);
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:999px;
+  padding:3px 11px;
+  margin-left:auto;
+}
+.release-summary{
+  color:var(--ink-2);
+  font-size:14px;
+  margin:-8px 0 22px;
+  max-width:70ch;
+}
+
+/* ---------- 變更群組 ---------- */
+.group{margin-bottom:26px}
+.group-title{
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:.1em;
+  color:var(--ink-3);
+  margin:0 0 11px;
+  text-transform:none;
+}
+.items{list-style:none;margin:0;padding:0;display:grid;gap:11px}
+.item{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:16px 18px;
+  box-shadow:var(--shadow);
+}
+.item-head{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  margin-bottom:7px;
+}
+.item-no{
+  flex:0 0 auto;
+  min-width:22px;
+  height:22px;
+  border-radius:7px;
+  background:var(--navy);
+  color:#fff;
+  font-size:11.5px;
+  font-weight:600;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0 5px;
+  margin-top:3px;
+  font-variant-numeric:tabular-nums;
+}
+.item h3{
+  margin:0;
+  font-size:16px;
+  line-height:1.5;
+  font-weight:600;
+}
+.item p{margin:0 0 4px;color:var(--ink-2);font-size:14px}
+.item p:last-of-type{margin-bottom:0}
+.item .detail{
+  margin-top:8px;
+  padding-left:14px;
+  border-left:2px solid var(--line-2);
+  font-size:13.5px;
+  color:var(--ink-2);
+}
+.item .detail ul{margin:0;padding-left:17px}
+.item .detail li{margin:2px 0}
+
+/* ---------- 點選路徑 ---------- */
+.path{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:5px;
+  margin-top:12px;
+  padding-top:11px;
+  border-top:1px dashed var(--line);
+  font-size:12.5px;
+}
+.path-label{
+  color:var(--ink-3);
+  margin-right:3px;
+  white-space:nowrap;
+}
+.crumb{
+  background:#fbf6f2;
+  border:1px solid var(--line);
+  border-radius:6px;
+  padding:3px 9px;
+  color:var(--ink);
+  white-space:nowrap;
+}
+.crumb.nav{background:var(--navy);border-color:var(--navy);color:#fff}
+.crumb.tab{background:var(--accent-soft);border-color:#f2d7cb;color:var(--accent)}
+.sep{color:var(--ink-3);font-size:11px}
+
+/* ---------- 標記 ---------- */
+.tag{
+  display:inline-block;
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:.03em;
+  border-radius:5px;
+  padding:1px 7px;
+  margin-left:7px;
+  vertical-align:2px;
+  white-space:nowrap;
+}
+.tag.new{background:var(--green-soft);color:var(--green)}
+.tag.fix{background:#eaf0f6;color:#3a5a78}
+.tag.move{background:#f6efe4;color:#8a6a2a}
+.tag.rename{background:#f2ecf6;color:#6b4a86}
+.tag.pending{background:#fdf0ea;color:var(--accent)}
+
+/* ---------- 待確認 ---------- */
+.open-questions{
+  background:#fffdf7;
+  border:1px solid #f0e2c8;
+  border-radius:var(--radius);
+  padding:18px 20px;
+  margin-top:8px;
+}
+.open-questions h3{margin:0 0 10px;font-size:15px;color:#8a6a2a}
+.open-questions ol{margin:0;padding-left:20px;color:var(--ink-2);font-size:13.5px}
+.open-questions li{margin:7px 0}
+.open-questions li b{color:var(--ink)}
+
+/* ---------- 頁尾 ---------- */
+footer{
+  margin-top:50px;
+  padding-top:20px;
+  border-top:1px solid var(--line);
+  color:var(--ink-3);
+  font-size:12.5px;
+}
+
+/* ---------- 窄螢幕 ---------- */
+@media (max-width:720px){
+  body{font-size:14.5px}
+  .masthead{padding:30px 0 22px;margin-bottom:26px}
+  h1{font-size:22px}
+  .wrap{padding:0 15px 56px}
+  .release-ver{font-size:20px}
+  .release-vs{margin-left:0;width:100%}
+  .item{padding:14px 15px}
+  .item h3{font-size:15px}
+  .path{font-size:12px}
+}
+
+/* 同一項變更有第二條路徑時，共用上方的分隔線 */
+.path + .path{margin-top:6px;padding-top:0;border-top:0}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <span class="eyebrow">版本說明 RELEASE NOTE</span>
+    <h1>精神健康個案通報管理儀表板</h1>
+    <p class="lede">
+      本頁整理 V2 以後每一版相對於前一版的差異，並標示每項變更在儀表板上的實際點選位置，
+      方便會議上直接對照確認。版本由新到舊排列。
+    </p>
+
+    <nav class="entries" aria-label="版本入口">
+      <a class="entry current" href="../v8/index.html"><b>V8</b><span>2026-11-05｜目前版本</span></a>
+      <a class="entry" href="../v7/index.html"><b>V7</b><span>2026-10-16</span></a>
+      <a class="entry" href="../v6/index.html"><b>V6</b><span>2026-09-29</span></a>
+      <a class="entry" href="../v5/index.html"><b>V5</b><span>2026-09-25</span></a>
+      <a class="entry" href="../v4/index.html"><b>V4</b><span>2026-09-25</span></a>
+      <a class="entry" href="../v3/index.html"><b>V3</b><span>2026-09-06 ～ 09-08</span></a>
+      <a class="entry" href="../v2/index.html"><b>V2</b><span>2026-09-06｜基準版本</span></a>
+      <a class="entry" href="../index.html"><b>入口頁</b><span>自動導向最新版</span></a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="howto">
+    <strong>怎麼看「點選路徑」：</strong>
+    深色標籤是頁首下方主選單的頁面名稱，橘色標籤是頁面內的子頁籤或按鈕，灰色標籤是卡片或區塊名稱。
+    依序點下去就會看到該項變更。
+  </div>
+
+  <!-- ===================== V8 ===================== -->
+  <section class="release" id="v8">
+    <div class="release-head">
+      <h2 class="release-ver">V8</h2>
+      <span class="release-date">2026-11-05</span>
+      <span class="release-vs">相較 V7</span>
+    </div>
+    <p class="release-summary">
+      以 V7 為基礎，在指揮儀表板新增「平台使用率」子頁籤：帳號建立後曾登入過的帳號數 ÷ 平台總帳號數，
+      呈現全平台使用率與各單位使用率。另外修正結案率圓環中間的數字在桌機上超出圓環的問題。其餘各頁內容與資料均未更動。
+    </p>
+
+    <div class="group">
+      <h3 class="group-title">指揮儀表板</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">1</span>
+            <h3>新增「平台使用率」<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            子頁籤列最右側新增「平台使用率」，版面與「結案率」相同：左側圓環是全平台使用率，下方列出曾登入與總帳號數；
+            右側列出各單位的使用率，由高到低排序。
+          </p>
+          <div class="detail">
+            <ul>
+              <li><b>計算方式</b>：平台使用率＝帳號建立後曾登入過的帳號數 ÷ 平台總帳號數；從未登入過的帳號計入分母</li>
+              <li><b>各單位</b>：七大網絡（民政、社政、消防、教育、勞政、警察、衛政）與醫療機構，每列顯示使用率、曾登入／總帳號數、未曾登入的帳號數</li>
+              <li><b>統計時間</b>：統計至資料日（原型為 2026/09/25），不受日期區間篩選影響</li>
+              <li>畫面數字為原型模擬資料；單位分類與帳號資料來源待確認</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">指揮儀表板</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">平台使用率</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">2</span>
+            <h3>結案率圓環數字修正<span class="tag fix">修正</span></h3>
+          </div>
+          <p>
+            桌機上「年度結案率」圓環中間的數字會比圓環內圈還寬、壓到外圈。改為數字大小依圓環本身的大小縮放，
+            各種螢幕尺寸都會落在內圈裡；新增的平台使用率圓環也套用同樣做法。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">指揮儀表板</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">結案率</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== V7 ===================== -->
+  <section class="release" id="v7">
+    <div class="release-head">
+      <h2 class="release-ver">V7</h2>
+      <span class="release-date">2026-10-16</span>
+      <span class="release-vs">相較 V6</span>
+    </div>
+    <p class="release-summary">
+      以 V6 為基礎，放大各頁過濾器按鈕的文字（日期區間、本日／本月／本季／本年度、通報類別等），桌機、平板、手機都已調整。
+      頁面上的按鈕高度不變，桌機版面不會位移；另外修正兩處手機版過濾器的排版。各頁內容與資料均未更動。
+    </p>
+
+    <div class="group">
+      <h3 class="group-title">全站</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">1</span>
+            <h3>各頁過濾器按鈕文字放大<span class="tag fix">字級</span></h3>
+          </div>
+          <p>
+            AI 模型預測準確率頁沒有過濾器，其餘八頁頁首下方的過濾器文字都放大，彈窗內的篩選按鈕也一併調整：
+          </p>
+          <div class="detail">
+            <ul>
+              <li><b>時間篩選</b>：開始／結束日期、套用、本日／本月／本季／本年度</li>
+              <li><b>通報類別</b>：全部／緊急醫療／優化計畫，以及左側的「通報類別分析」</li>
+              <li><b>指揮儀表板 › 同期比較</b>：同月比較／同期累計／其他月份比較、選擇月份</li>
+              <li><b>彈窗</b>：案件熱點地圖的初評風險（全部／高風險／中風險／低風險）、精神症狀改善成效指標個案明細的全部／改善／持平／變差</li>
+              <li>主選單與各頁的第二層頁籤不屬於過濾器，維持原字級</li>
+            </ul>
+          </div>
+          <div class="detail">
+            <ul>
+              <li><b>桌機</b>：1920×1080 螢幕（含 Windows 125% 縮放）由 14px 放大為 16px；1280–1440 寬的桌機由約 12.5–13.5px 放大為 15px</li>
+              <li><b>平板（900–1199 px）</b>：按鈕由 11px 放大為 15px，「開始日期／結束日期」由 9px 放大為 12px</li>
+              <li><b>手機（899 px 以下）</b>：按鈕由 11px 放大為 15px，「開始日期／結束日期」由 11px 放大為 13px（日期欄位原本就是 16px）</li>
+              <li><b>其他</b>：同期比較、個案明細的篩選鈕由 12px 放大為 15–16px；熱點地圖的初評風險由 11px 放大為 14px</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">各頁</span>
+            <span class="sep">›</span>
+            <span class="crumb">頁首下方的過濾器</span>
+          </div>
+          <div class="path">
+            <span class="path-label">另見</span>
+            <span class="crumb nav">指揮儀表板</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">同期比較</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">2</span>
+            <h3>手機版過濾器排版修正<span class="tag fix">修正</span></h3>
+          </div>
+          <p>
+            （1）螢幕寬度 681–899 px（大手機橫放、直式平板）時，通報案件風險分析、醫療機構端處理成效分析、醫院內控指標(SNQ)
+            三頁的「全部／緊急醫療／優化計畫」按鈕會凸出所在列約 8px、貼到下方卡片，已修正。
+            （2）320 px 的小手機上，同期比較的「其他月份比較」會折成兩行並超出工具列；改為一列放不下時換到下一列並撐滿寬度。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">通報案件風險分析</span>
+            <span class="sep">／</span>
+            <span class="crumb nav">醫療機構端處理成效分析</span>
+            <span class="sep">／</span>
+            <span class="crumb nav">醫院內控指標(SNQ)</span>
+          </div>
+          <div class="path">
+            <span class="path-label">另見</span>
+            <span class="crumb nav">指揮儀表板</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">同期比較</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== V6 ===================== -->
+  <section class="release" id="v6">
+    <div class="release-head">
+      <h2 class="release-ver">V6</h2>
+      <span class="release-date">2026-09-29</span>
+      <span class="release-vs">相較 V5</span>
+    </div>
+    <p class="release-summary">
+      以 V5 為基礎，針對手機版（螢幕寬度 899 px 以下）進行 RWD 優化：主選單改為下拉、第二層頁籤自動換行、
+      長條圖改為橫向、指揮板改為直式、案件熱點地圖支援觸控操作並可捲動、彈窗內表格與 AI 圖表不必左右滑。
+      另外「優化計畫無法收案」等可點擊卡片的提示改為明顯的按鈕（桌機同步調整）。其餘桌機版面、各頁內容與資料均未更動。
+    </p>
+
+    <div class="group">
+      <h3 class="group-title">全站</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">1</span>
+            <h3>手機版主選單改為下拉選單<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            螢幕寬度 899 px 以下（手機、直式小平板）時，頁首下方的 9 個主選單原本是單列橫向捲動的頁籤，
+            一次只看得到 2～3 個，其他頁面要左右滑才找得到。V6 改為下拉選單：欄位顯示目前所在的頁面，點開即列出全部 9 個頁面。
+          </p>
+          <div class="detail">
+            <ul>
+              <li>往下捲動時選單固定在畫面頂端，隨時可以切換頁面</li>
+              <li>在頁面下方切換時，會自動回到新頁面的開頭，不會停在上一頁捲到的位置</li>
+              <li>點開後使用手機系統內建的選單介面，選項大、好點選</li>
+              <li>桌機與平板（900 px 以上）維持原本的頁籤按鈕，不受影響</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">怎麼確認</span>
+            <span class="crumb">用手機開啟（或把視窗縮到 899 px 以下）</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">頁首下方「頁面」下拉選單</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">2</span>
+            <h3>第二層頁籤過長時自動換行<span class="tag fix">排版</span></h3>
+          </div>
+          <p>
+            手機上各頁的第二層頁籤原本排成一列、超出的部分要左右滑（例如案件處理效率指標的第 4 個頁籤被切掉）。
+            V6 改為膠囊按鈕，放不下時自動換到下一列；目前所在的頁籤以實心藍色標示。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">案件處理效率指標</span>
+            <span class="sep">›</span>
+            <span class="crumb">第二層頁籤列</span>
+          </div>
+          <div class="path">
+            <span class="path-label">另見</span>
+            <span class="crumb nav">精神症狀改善成效指標</span>
+            <span class="sep">／</span>
+            <span class="crumb nav">指揮儀表板</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">3</span>
+            <h3>長條圖在手機改為橫向<span class="tag fix">排版</span></h3>
+          </div>
+          <p>
+            直條圖在手機上只看得到 3～5 根，其餘要在卡片內左右滑。螢幕寬度 899 px 以下改為橫條：
+            每列依序是名稱、長條、數值，全部項目一次看完。900 px 以上（桌機、平板橫放）維持原本的直條圖。
+          </p>
+          <div class="detail">
+            <ul>
+              <li><b>基本資料</b>：臺北市各行政區通報案件數、年齡（年齡的數值原本要滑過才看得到，橫向時直接顯示）</li>
+              <li><b>通報者基本資料分析</b>：七大網絡轉介數量、平台使用者滿意度調查回收率、滿意度調查分數（原本的配色保留）</li>
+              <li><b>通報案件風險分析</b>：「初評」堆疊條原本會超出卡片，改為貼齊卡片寬度；太窄放不下百分比的區段不顯示文字，滑過仍看得到</li>
+              <li>切換日期或通報類別後，橫條會跟著重畫</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">基本資料</span>
+            <span class="sep">／</span>
+            <span class="crumb nav">通報者基本資料分析</span>
+            <span class="sep">／</span>
+            <span class="crumb nav">通報案件風險分析</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="group">
+      <h3 class="group-title">指揮儀表板</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">4</span>
+            <h3>指揮板流程卡片在手機改為直式<span class="tag fix">排版</span></h3>
+          </div>
+          <p>
+            桌機的指揮板是「通報類別 × 案件狀態」的矩陣加連線，手機上右側的類別與明細整個跑到畫面外。
+            V6 在 899 px 以下改為由上往下閱讀：
+          </p>
+          <div class="detail">
+            <ul>
+              <li>總通報案件大卡，下方是待派、已派、結案、未轉介／開案四個總體狀態</li>
+              <li>「依通報類別」：緊急醫療與第一～三類優化計畫各一張卡，該類別的四個狀態排在卡片下方</li>
+              <li>點總通報或類別卡片仍可收合／展開，名稱旁的 ▾／▸ 表示目前狀態</li>
+              <li>手機直式時狀態卡兩兩一排；大手機與直式平板（600–899 px）四個一排</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">指揮儀表板</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">指揮板</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="group">
+      <h3 class="group-title">基本資料 › 通報案件區域分布</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">5</span>
+            <h3>案件熱點地圖手機版優化，支援一般觸控操作<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            原本手機上的臺北市只畫在地圖框中間一小塊、點位很小，圖例還疊在地圖下半部，蓋住文山、南港一帶。
+          </p>
+          <div class="detail">
+            <ul>
+              <li>地圖框改為直式並依比例繪製，臺北市撐滿整個寬度；點位與行政區名稱放大到手指點得到、看得清楚的大小</li>
+              <li>圖例移到地圖下方，說明文字完整換行，縮放按鈕加大</li>
+              <li>觸控：雙指縮放、放大後單指拖曳、雙擊放大、點行政區選取、點點位看明細；拖曳時提示框自動收起</li>
+              <li>未放大時地圖固定不動，不會被拖出畫面（桌機用滑鼠拖曳同樣適用）</li>
+              <li>旋轉手機或視窗大小改變時，地圖依新比例重畫，已選取的行政區會保留</li>
+              <li>彈窗可以往下捲動，看完地圖下方的「目前範圍」與行政區排行（原本整個彈窗無法捲動，排行看不到）；地圖未放大時，手指在地圖上上下滑動也會捲動彈窗，放大後才改為拖曳地圖</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">基本資料</span>
+            <span class="sep">›</span>
+            <span class="crumb">臺北市各行政區通報案件數</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">查看熱點地圖 ↗</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="group">
+      <h3 class="group-title">醫療機構端處理成效分析（桌機與手機）</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">6</span>
+            <h3>「優化計畫無法收案」的可點擊提示改為明顯按鈕<span class="tag fix">調整</span></h3>
+          </div>
+          <p>
+            原本只有一行灰色小字「點擊查看各無法收案原因人數與占比」，看不出卡片可以點。
+            改為與 SNQ 頁相同的藍色按鈕樣式（含 ›），滑過或按下時也有回饋；桌機與手機都已調整。
+          </p>
+          <p>AI 模型預測準確率頁「預測吻合程度」卡片的「點擊查看變化」是同樣的問題，一併改為按鈕樣式。</p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">醫療機構端處理成效分析</span>
+            <span class="sep">›</span>
+            <span class="crumb">優化計畫無法收案</span>
+          </div>
+          <div class="path">
+            <span class="path-label">另見</span>
+            <span class="crumb nav">AI模型預測準確率</span>
+            <span class="sep">›</span>
+            <span class="crumb">預測吻合程度</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="group">
+      <h3 class="group-title">彈窗與 AI 圖表（手機版）</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">7</span>
+            <h3>「優化計畫無法收案原因」等彈窗的表格不用左右滑<span class="tag fix">排版</span></h3>
+          </div>
+          <p>
+            原本手機上這張表的原因、人數、百分比三欄被撐寬，要在彈窗裡左右滑才看得到。
+            改為三欄直接排進螢幕寬度，較長的原因自動換行，320 px 的小手機也不用左右滑。
+          </p>
+          <p>「精神症狀改善成效指標」點圓環開啟的「個案明細」表格同樣處理。</p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">醫療機構端處理成效分析</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">優化計畫無法收案</span>
+          </div>
+          <div class="path">
+            <span class="path-label">另見</span>
+            <span class="crumb nav">精神症狀改善成效指標</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">任一圓環</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">8</span>
+            <h3>AI 回歸線圖在手機縮進螢幕寬度<span class="tag fix">排版</span></h3>
+          </div>
+          <p>
+            回歸線圖原本在手機上要左右滑才看得到右半部，改為整張縮進螢幕寬度，
+            座標數字、軸標題與線條依縮放比例放大，縮小後仍清楚可讀。
+            「點擊查看變化」開啟的吻合程度歷程圖同樣處理。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">AI模型預測準確率</span>
+            <span class="sep">›</span>
+            <span class="crumb">AI 預測與專業評估有多接近</span>
+          </div>
+          <div class="path">
+            <span class="path-label">另見</span>
+            <span class="crumb nav">AI模型預測準確率</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">點擊查看變化</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== V5 ===================== -->
+  <section class="release" id="v5">
+    <div class="release-head">
+      <h2 class="release-ver">V5</h2>
+      <span class="release-date">2026-09-25</span>
+      <span class="release-vs">相較 V4</span>
+    </div>
+    <p class="release-summary">
+      以 V4 為基礎：區域分布圖點位加大並合併同址通報、全站字級以 1920×1080 為基準放大、
+      模擬資料補到 2026/09/25，院內 SNQ 的結案後轉介比例可點開 dialog 看門診／居家／住院，醫療機構端的無法收案原因表收成卡片＋dialog。頁面架構未更動。
+    </p>
+
+    <div class="group">
+      <h3 class="group-title">基本資料 › 通報案件區域分布</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">1</span>
+            <h3>個案點位加大，放大地圖時點位跟著變大<span class="tag new">調整</span></h3>
+          </div>
+          <p>
+            單一通報的點位由直徑約 6px 加大到約 11px；放大地圖時點位會以縮放倍率的平方根成長（放大 4 倍時約為 2 倍大），不再維持固定的小點。縮放上限由 500% 提高到 800%，密集區可以再拉近分開。行政區名稱也改為只小幅放大，不會蓋住點位。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">基本資料</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">查看熱點地圖</span>
+            <span class="sep">›</span>
+            <span class="crumb">臺北市</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">＋ 放大</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">2</span>
+            <h3>同一地址的多筆通報合併為一個點位<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            同一組座標有多筆通報時，合併成一個較大的點位，圓內數字為件數，顏色取該址最高的初評風險等級。滑過點位會列出該地址的每一筆通報（編號、通報日期、初評風險）。套用「初評風險」篩選時，件數與顏色會依篩選後的個案重算。
+          </p>
+          <div class="detail">
+            <ul>
+              <li>模擬資料中約 2 成個案與同區既有通報同址，目前臺北市 420 件落在 347 個地址，其中 59 個地址有 2 件以上</li>
+              <li>圖例新增「同址多筆通報」示意</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">基本資料</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">查看熱點地圖</span>
+            <span class="sep">›</span>
+            <span class="crumb">臺北市</span>
+            <span class="sep">›</span>
+            <span class="crumb">點位</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="group">
+      <h3 class="group-title">醫院內控指標(SNQ)</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">3</span>
+            <h3>結案後轉介至本院醫療系統比例：點擊開啟門診／居家／住院明細<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            點擊「緊急醫療結案後轉介至本院醫療系統比例」或「優化計劃結案後轉介至本院醫療系統比例」卡片，開啟 dialog 顯示三項各自的比例，每項皆為（於結案日後在 HIS 系統有該項就醫紀錄之個案數／總通報個案數）×100%，並附註「單一個案可能會有重複醫療處置，所以三項比例相加可能會超過100%」與三項合計。日期與通報類別篩選會同步換算。
+          </p>
+          <div class="detail">
+            <ul>
+              <li>緊急醫療（本年度）：門診 62.5%、居家 21.1%、住院 27.6%，合計 111.2%（任一項 68.4%）</li>
+              <li>優化計劃（本年度）：門診 54.3%、居家 30.8%、住院 27.1%，合計 112.2%（任一項 54.8%）</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">醫院內控指標(SNQ)</span>
+            <span class="sep">›</span>
+            <span class="crumb">通報結案後醫療銜接</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">點擊卡片</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="group">
+      <h3 class="group-title">醫療機構端處理成效分析</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">4</span>
+            <h3>「優化計畫無法收案」原因表收成一張卡片，點擊開啟 dialog<span class="tag move">位置調整</span></h3>
+          </div>
+          <p>
+            原本頁面左側整欄是無法收案原因表。V5 改為右側「結案後醫療資源使用分析」裡的一張指標卡，
+            尺寸與樣式和其他卡片相同，顯示總無法收案 60 件與人數最多的原因；點擊卡片開啟 dialog，內含完整原因表（人數欄仍可排序）。
+            選「緊急醫療」時此卡片隱藏。其餘六張指標卡改為撐滿整個區塊高度。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">醫療機構端處理成效分析</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">優化計畫無法收案</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="group">
+      <h3 class="group-title">指揮儀表板</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">5</span>
+            <h3>同期比較改為比較「案件處理效率指標」，並新增通報類別篩選<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            原本的「平台總通報件數」與「通報案件風險分佈」兩張圖移除，改為與「案件處理效率指標」頁相同的指標與分組：
+            總覽（高／中／低風險個案處理時間）、緊急醫療處置效率、優化計畫醫院端處置效率、優化計畫衛生局處置效率，
+            每項指標並列 2024、2025、2026 同期數值與較去年的變化（綠色改善、紅色退步，占比類僅供參考不判斷好壞）。
+            上方同月比較／同期累計／其他月份比較照舊可切換；新增「全部／緊急醫療／優化計畫」篩選，
+            選緊急醫療只顯示總覽與緊急醫療，選優化計畫只顯示總覽、醫院端與衛生局。
+          </p>
+          <div class="detail">
+            <ul>
+              <li>2026 年數值與效率頁本年度數值相同；2024、2025 年為原型推算的同期數值</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">指揮儀表板</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">同期比較</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">全部／緊急醫療／優化計畫</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="group">
+      <h3 class="group-title">全站</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">6</span>
+            <h3>字級以 1920×1080 為基準放大<span class="tag fix">版面</span></h3>
+          </div>
+          <p>
+            V4 桌機版有大量 8–11px 的說明文字、座標軸與按鈕。V5 在寬度 ≥1200px 的桌機版面，把這些文字放大到約 12–15px。Windows 常見的 125% 顯示縮放下，1920×1080 螢幕的瀏覽器視窗只有約 1536px 寬，所以字級在約 1500px 寬就達到上限，1366 等較小桌機也一併放大；較矮的視窗（高 ≤800px）圖表內文字自動小一級避免擠壓。平板與手機的響應式版面不變。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">各頁</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">7</span>
+            <h3>修正既有爆版<span class="tag fix">修正</span></h3>
+          </div>
+          <p>
+            （1）1280×720 等較矮視窗，「衛生局處理時間」最後一列被切掉；1200–1250 寬時「本院處理時效」第三列被切掉，改為至少容納內容、放不下時卡片內捲動。（2）平板寬度（≤899px）「通報者基本資料分析」第一欄被擠成約 30px，圓餅圖與圖例全擠在一起，改為依序單欄排列。（3）手機寬度「基本資料」頁可以左右晃動 17px（年齡長條最右一根的提示框超出畫面），已修正。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">案件處理效率指標</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">優化計畫衛生局處置效率</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">8</span>
+            <h3>模擬資料補到 2026/09/25<span class="tag fix">資料</span></h3>
+          </div>
+          <p>
+            所有頁面的資料截止日、日期選擇器上限與「本日／本月／本季／本年度」區間由 2026/09/04（指揮儀表板為 09/01）改為 2026/09/25。本月（9/1–9/25）通報 36 件、本季 114 件、本日 2 件；指揮儀表板同期比較的區間標示同步改為 9/25。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">指揮儀表板</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">同期比較</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="open-questions">
+      <h3>待確認事項</h3>
+      <ol>
+        <li>
+          <b>本年度總數仍維持 420 件。</b>
+          補資料時只延長了截止日並更新 9 月（本月、本季、本日）的數字；本年度 420 件被多頁指標引用
+          （結案率 100/420、風險 46/234/140、七大網絡 420 件等），若要改成含 9/5–9/25 新增案件的總數，需要全站一起重算。
+        </li>
+        <li>
+          <b>門診／居家／住院三項比例為模擬值。</b>
+          為符合「三項相加會超過 100%」的說明，模擬資料設定每位有就醫紀錄的個案平均約有 1.6–2 種處置；正式資料接上後以實際比例為準。
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ===================== V4 ===================== -->
+  <section class="release" id="v4">
+    <div class="release-head">
+      <h2 class="release-ver">V4</h2>
+      <span class="release-date">2026-09-25</span>
+      <span class="release-vs">相較 V3</span>
+    </div>
+    <p class="release-summary">
+      以 V3 為基礎，套用會議修改意見：緊醫處理流程依受理方式拆成兩張表、效率頁籤與多組圖表位置對調、
+      指標定義對齊官方指標清單，並在區域分布圖加入初評風險過濾開關。頁面架構與資料來源均未更動。
+    </p>
+
+    <!-- A 案件處理效率指標 -->
+    <div class="group">
+      <h3 class="group-title">案件處理效率指標</h3>
+      <ul class="items">
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">1</span>
+            <h3>緊醫處理流程依受理方式拆成兩張表<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            原本只有一條時間軸，從「完成通報」一路畫到「實際出勤」，總反應時間 2.5 小時；
+            但電話受理的案件不會出勤，這個時間對它們並不成立。V4 改為兩個獨立的流程區塊。
+          </p>
+          <div class="detail">
+            <ul>
+              <li><b>① 電話（電話或平台受理）</b>：完成通報 → 完成派案 → 完成受理方式（電話諮詢結案），占 61.7%（電話處置率）</li>
+              <li><b>② 電話＋出勤</b>：在上述流程後再延伸到「實際出勤」，占 38.3%（出勤處置率），總反應時間 2.5 小時</li>
+              <li>電話路徑另列一個總反應時間 1.0 小時（派案 0.3 ＋ 首次專業評估 0.7），此為推算值，詳見本版「待確認事項」</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">案件處理效率指標</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">緊急醫療處置效率</span>
+            <span class="sep">›</span>
+            <span class="crumb">緊醫處理流程</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">2</span>
+            <h3>「優化計畫醫院端」與「優化計畫衛生局」兩個頁籤對調位置<span class="tag move">位置調整</span></h3>
+          </div>
+          <p>
+            頁籤順序由
+            <em>總覽 → 緊急醫療 → 衛生局 → 醫院端</em>
+            改為
+            <em>總覽 → 緊急醫療 → 醫院端 → 衛生局</em>（醫院端在左、衛生局在右）。
+            總覽頁下方「各處置面向重點」的三張跳轉卡片中，醫院端與衛生局兩張也同步對調，與頁籤順序一致。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">案件處理效率指標</span>
+            <span class="sep">›</span>
+            <span class="crumb">子頁籤列</span>
+          </div>
+          <div class="path">
+            <span class="path-label">另見</span>
+            <span class="crumb nav">案件處理效率指標</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">總覽</span>
+            <span class="sep">›</span>
+            <span class="crumb">各處置面向重點</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">3</span>
+            <h3>「本院醫療轉介占率」定義對齊官方指標清單<span class="tag fix">定義修正</span></h3>
+          </div>
+          <p>
+            分母原本寫成「轉介三總北投 ＋ 轉介他院案件數」，改為官方清單的用字「衛生局轉介醫療機構案件數」，
+            卡片小字與指標定義彈窗都已更新。兩者其實是同一群案件（轉介三總北投 208 ＋ 轉介他院 83 ＝ 291 件），
+            占率 71.5% 不變；修正是為了避免日後對帳時被當成兩個不同指標。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">案件處理效率指標</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">優化計畫衛生局處置效率</span>
+            <span class="sep">›</span>
+            <span class="crumb">本院醫療轉介占率</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">「i」指標定義</span>
+          </div>
+        </li>
+
+      </ul>
+    </div>
+
+    <!-- B 精神症狀改善成效指標 -->
+    <div class="group">
+      <h3 class="group-title">精神症狀改善成效指標</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">4</span>
+            <h3>追蹤量表「可追蹤率」與「回收率」主從對調<span class="tag move">位置調整</span></h3>
+          </div>
+          <p>
+            會議紀錄在「可追蹤率」旁標註「重要」，因此「結案後 3 個月」與「結案後 6 個月」兩張卡都改為：
+            可追蹤率在上方主要區塊（大字＋進度條），原本在主位的「回收率」移到下方，與「無法填答率」並列。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">精神症狀改善成效指標</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">評估表填寫狀況</span>
+            <span class="sep">›</span>
+            <span class="crumb">結案後 3 個月／6 個月</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- C 通報者基本資料分析 -->
+    <div class="group">
+      <h3 class="group-title">通報者基本資料分析</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">5</span>
+            <h3>「轉介人所屬單位占比」圓餅圖依占比由大到小排列<span class="tag fix">調整</span></h3>
+          </div>
+          <p>扇形（由 12 點鐘方向順時針）與右側圖例都改為依占比由大到小；占比相同時依單位名稱排序，確保每次開啟順序一致。</p>
+          <p>
+            <b>注意：</b>預設的「全部」資料原本就剛好由大到小，直接看不出差異。
+            請把「通報類別分析」切到「緊急醫療」或「優化計畫」比較 —— 例如緊急醫療下，V3 仍把社政排第一，
+            V4 會正確把占比最高的警察（23.8%）排第一。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">通報者基本資料分析</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">通報類別分析「緊急醫療」</span>
+            <span class="sep">›</span>
+            <span class="crumb">轉介人所屬單位占比</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">6</span>
+            <h3>「滿意度調查分數」與「調查回收率」上下對調<span class="tag move">位置調整</span></h3>
+          </div>
+          <p>滿意度分數移到上方、調查回收率移到下方（寬螢幕為右側上下兩張；窄螢幕單欄時，分數同樣排在回收率之前）。</p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">通報者基本資料分析</span>
+            <span class="sep">›</span>
+            <span class="crumb">平台使用者滿意度調查分數／回收率</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">7</span>
+            <h3>滿意度分數改用綠色系<span class="tag fix">配色</span></h3>
+          </div>
+          <p>
+            分數長條改為深綠到淺綠的七階色（分數最高的單位最深），與回收率的暖色系區分開來。
+            <b>注意：</b>只有「滿意度分數」改綠色，「調查回收率」仍維持原暖色系 —— 若兩張都要改綠，請告知。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">通報者基本資料分析</span>
+            <span class="sep">›</span>
+            <span class="crumb">平台使用者滿意度調查分數</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- D 指揮儀表板 -->
+    <div class="group">
+      <h3 class="group-title">指揮儀表板</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">8</span>
+            <h3>年度結案率趨勢改為最新年度在上<span class="tag move">位置調整</span></h3>
+          </div>
+          <p>會議紀錄中的「年度結案周期」即此圖。年份排列由 2023 → 2026 反轉為 <b>2026 → 2025 → 2024 → 2023</b>，本年度置頂。</p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">指揮儀表板</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">結案率</span>
+            <span class="sep">›</span>
+            <span class="crumb">年度結案率趨勢</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">9</span>
+            <h3>結案率整頁字體放大<span class="tag fix">排版</span></h3>
+          </div>
+          <p>
+            原本部分文字只有 8–10 px，投影時看不清楚。桌機寬度（1200 px 以上）的字級普遍放大，
+            以 1600×900 實測約放大 20–45%：中央結案率數字 42 → 61 px、卡片標題 17 → 21 px、各年份與比率 13–15 → 16–20 px。
+            視窗高度較矮時放大幅度會自動收斂，避免擠出卡片。
+          </p>
+          <p><b>注意：</b>目前只套用在「結案率」這一頁 —— 若「整頁字體＋大」指的是整個指揮儀表板，請告知再擴大範圍。</p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">指揮儀表板</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">結案率</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">10</span>
+            <h3>「總通報件數」更名為「平台總通報件數」<span class="tag rename">更名</span></h3>
+          </div>
+          <p>同期比較頁左側長條圖的卡片標題；「同月比較／同期累計／其他月份比較」三種模式共用此標題。</p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">指揮儀表板</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">同期比較</span>
+            <span class="sep">›</span>
+            <span class="crumb">平台總通報件數</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- E 基本資料 -->
+    <div class="group">
+      <h3 class="group-title">基本資料</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">11</span>
+            <h3>區域分布圖新增初評風險等級過濾開關<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            地圖工具列新增「全部／高風險／中風險／低風險」四段開關。開啟地圖即為臺北市點位圖，開關就在工具列右側；
+            切回「全臺」層級時開關會自動隱藏。
+          </p>
+          <div class="detail">
+            <ul>
+              <li>切換只改點位顯示，不重繪地圖，目前的縮放與平移位置會保留</li>
+              <li>頂部件數、側欄案件數、行政區排行，以及滑過行政區時的提示框，都會同步換算成篩選後的數字（本年度：高 46／中 234／低 140，合計 420）</li>
+              <li>單一等級時排行長條改為與最高值比較的長度條（堆疊條在單一等級下永遠是 100%，沒有資訊量）</li>
+              <li>圖例會把未選取的等級淡出，兼作「現在看到什麼」的狀態提示</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">基本資料</span>
+            <span class="sep">›</span>
+            <span class="crumb">臺北市各行政區通報案件數</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">查看熱點地圖 ↗</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">工具列「初評風險」</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- 待確認 -->
+    <div class="group">
+      <h3 class="group-title">本版待確認事項</h3>
+      <div class="open-questions">
+        <h3>以下五點需要需求端回覆後才能定案</h3>
+        <ol>
+          <li>
+            <b>中風險／低風險個案處理時間的公式。</b>
+            官方 28 項指標清單中，「中風險個案處理時間」與「低風險個案處理時間」的公式文字
+            都寫成「緊醫<u>高風險</u>個案完成受理 OR 優化計畫完成首次訪視時間 − <u>高風險</u>個案通報時間」，
+            與高風險那條完全相同。儀表板目前使用的是修正後的中／低風險文字；若三條確實都以高風險為基準，請告知改回。
+          </li>
+          <li>
+            <b>「緊醫電話受理總反應時間」是推算值。</b>
+            官方清單只有「緊醫出勤總反應時間」，沿用它會讓電話案件被記成含出勤準備的 2.5 小時，
+            因此拆表時新增了電話路徑的 1.0 小時（0.3 ＋ 0.7）。
+            請決定：保留（標示為推算值）／改名（例如「緊醫電話處置完成時間」）／移除。
+          </li>
+          <li>
+            <b>院內追蹤「以年計算」的作法。</b>
+            「醫院內控指標(SNQ) › 院內追蹤與再住院指標」的定義文字目前寫「在Ｘ年中每年均穩定…」。
+            是要（a）把「Ｘ年」換成實際統計年度、（b）加一個年度選擇器，還是（c）改變計算基準本身？
+          </li>
+          <li>
+            <b>「醫師後台＋緊醫通報（補填已處理完案件）」的範圍。</b>
+            看起來屬於醫師後台的功能而非本儀表板。是要在醫師後台實作，還是儀表板上也要有對應呈現？
+          </li>
+          <li>
+            <b>「最新年分在上」是否也套用到同期比較。</b>
+            V4 只反轉了會議點名的年度結案率趨勢；同一個指揮儀表板的「同期比較 › 通報案件風險分佈」
+            仍是 2024 在上、2026 在下，兩張圖的年份方向相反。要一起改嗎？
+          </li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== V3 ===================== -->
+  <section class="release" id="v3">
+    <div class="release-head">
+      <h2 class="release-ver">V3</h2>
+      <span class="release-date">2026-09-06 ～ 09-08</span>
+      <span class="release-vs">相較 V2</span>
+    </div>
+    <p class="release-summary">
+      本版改動幅度最大：「案件處理效率指標」整頁重做並改為四頁籤、全站補上響應式與手機版排版、
+      區域分布圖由行政區面量圖改為個案 GPS 點位圖，同時把單檔大小壓到不到 V2 的三成。
+    </p>
+
+    <div class="group">
+      <h3 class="group-title">案件處理效率指標</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">1</span>
+            <h3>整頁重做，並改為四個頁籤<span class="tag new">重做</span></h3>
+          </div>
+          <p>
+            V2 的這一頁只有「轉介後處理率／平台使用率／首次通報個案介入達成率／首次醫療介入時間（平均）」
+            四張卡片、一個「依初評風險下探」，以及「全部／緊急醫療／優化計畫」類別切換。
+            V3 依指標清單的歸屬，改為依處置主體分頁呈現。
+          </p>
+          <div class="detail">
+            <ul>
+              <li><b>總覽</b>：不同風險個案處理時間（平均）＋ 各處置面向重點摘要卡（可點擊跳頁）</li>
+              <li><b>緊急醫療處置效率</b>：處置結果與反應時間、緊醫處理流程時間軸</li>
+              <li><b>優化計畫衛生局處置效率</b>：衛生局回覆與轉介、暫不轉介原因分布、衛生局處理時間</li>
+              <li><b>優化計畫醫院端處置效率</b>：開案、覆核與醫療介入、本院處理時效</li>
+              <li>每個指標都加上「指標定義」彈窗，說明分子分母與資料來源</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">案件處理效率指標</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">2</span>
+            <h3>修正頁面標題爆版<span class="tag fix">修正</span></h3>
+          </div>
+          <p>頁籤列改版後格線高度沒有跟著調整，篩選列壓住下方面板、蓋掉頁面眉標小字；已改為依內容自動決定高度。</p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">案件處理效率指標</span>
+            <span class="sep">›</span>
+            <span class="crumb">頁面標題區</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="group">
+      <h3 class="group-title">全站</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">3</span>
+            <h3>響應式與手機版排版<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            V2 在不同視窗大小下版面會跑掉，也缺乏手機版排版。V3 補上一套統一的響應式規則：
+            桌機（1200 px 以上）維持原本「一頁塞滿、不需捲動」的看板設計，較窄的螢幕改為正常上下捲動。
+          </p>
+          <div class="detail">
+            <ul>
+              <li>平板以下（1199 px 以下）解除固定高度，內容不再被裁切，改為上下捲動</li>
+              <li>手機（899 px 以下）主選單由 2 欄 × 5 列改為單列、可左右滑動並固定在畫面頂端</li>
+              <li>篩選列改為上下堆疊，按鈕不再被擠出畫面</li>
+              <li>多欄版面收為單欄；過寬的表格與圖表改為在卡片內左右滑動，整頁不會橫向捲動</li>
+              <li>彈窗在手機（599 px 以下）改為全螢幕顯示</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">怎麼確認</span>
+            <span class="crumb">縮放瀏覽器視窗寬度</span>
+            <span class="sep">›</span>
+            <span class="crumb">或用手機開啟</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">4</span>
+            <h3>單檔大小由 2.7 MB 壓到 791 KB<span class="tag fix">效能</span></h3>
+          </div>
+          <p>
+            主因是院徽：原圖為 2047×2047 px 的 PNG（1.55 MB，內嵌進檔案後占 2.07 MB），但畫面上只顯示約 55 px。
+            V3 改為 192×192 px 的無損 WebP（37 KB，內嵌後 49.7 KB，足夠 3 倍高解析螢幕），畫面上看不出差異；
+            整份檔案縮小約 71%，在行動網路下開啟明顯變快。
+          </p>
+          <div class="detail">
+            補充：先前曾建議改成 SVG，實際比對後發現院徽是全彩細節圖（金色漸層外環、中英文書法字、雙蛇杖等），
+            描繪成 SVG 反而會更大且失真，因此改用 WebP。
+          </div>
+          <div class="path">
+            <span class="path-label">怎麼確認</span>
+            <span class="crumb">頁首院徽</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">5</span>
+            <h3>入口頁自動導向最新版本<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            <code>tsghb-dashboard/</code> 入口原本是 V2 的完整複本（2.7 MB），每次發版都要整份覆蓋。
+            改為 4.3 KB 的導向頁：開啟後會自動探測是否有更新的版本資料夾並跳轉，
+            所以固定用這個連結就會停在最新版。目前會落在 V4。
+          </p>
+          <div class="path">
+            <span class="path-label">怎麼確認</span>
+            <span class="crumb">開啟 tsghb-dashboard/ 入口連結</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="group">
+      <h3 class="group-title">基本資料</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">6</span>
+            <h3>區域分布圖由面量圖改為個案 GPS 點位圖<span class="tag new">重做</span></h3>
+          </div>
+          <p>
+            V2 是以行政區為單位、依案件數深淺上色的面量圖。V3 改為每一筆通報個案依其地址座標落一個點，
+            顏色代表<b>初評風險</b>（高＝紅／中＝橘／低＝黃），與「通報案件風險分析」頁的色票一致。
+          </p>
+          <div class="detail">
+            <ul>
+              <li>底圖在點位模式改為中性淺色，只留行政區輪廓，避免面量色干擾點位判讀</li>
+              <li>右側行政區排行的長條改為「初評風險組成」堆疊條；圖例改為三級風險並顯示各級件數</li>
+              <li>點位滑過可看個案編號、行政區、初評風險與座標；點選行政區時，其他區的點位會淡出</li>
+              <li>縮放時點的大小維持固定，放大後不會糊成一團</li>
+              <li>全臺層級仍為縣市熱度圖；點位只在臺北市層級顯示（開啟地圖時即直接進入臺北市）</li>
+              <li>原型階段尚無真實地址，點位以各行政區的實際邊界取樣產生；接上真實資料後只需替換資料來源</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">基本資料</span>
+            <span class="sep">›</span>
+            <span class="crumb">臺北市各行政區通報案件數</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">查看熱點地圖 ↗</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="group">
+      <h3 class="group-title">精神症狀改善成效指標</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">7</span>
+            <h3>「高風險」量表更名為「風險減傷評估」<span class="tag rename">更名</span></h3>
+          </div>
+          <p>改善情況頁籤的四項評估量表（BSRS-5、CGI-S、GAF、高風險）中，最後一項更名為「風險減傷評估」，三個月、六個月兩張卡都已更新。</p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">精神症狀改善成效指標</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">改善情況</span>
+            <span class="sep">›</span>
+            <span class="crumb">風險減傷評估 三個月／六個月</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== V2 ===================== -->
+  <section class="release" id="v2">
+    <div class="release-head">
+      <h2 class="release-ver">V2</h2>
+      <span class="release-date">2026-09-06</span>
+      <span class="release-vs">基準版本</span>
+    </div>
+    <p class="release-summary">
+      本頁的差異比較以 V2 為起點。V2 已具備目前九個頁面的完整架構，後續版本都在此基礎上調整，沒有再增刪頁面。
+    </p>
+    <div class="group">
+      <h3 class="group-title">九個頁面</h3>
+      <ul class="items">
+        <li class="item">
+          <p>
+            基本資料｜通報案件風險分析｜案件處理效率指標｜精神症狀改善成效指標｜AI模型預測準確率｜
+            通報者基本資料分析｜醫療機構端處理成效分析｜醫院內控指標(SNQ)｜指揮儀表板
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb">頁首下方主選單</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <p>
+      三軍總醫院北投分院｜精神健康個案通報管理儀表板　原型版本說明<br>
+      資料為原型展示用途，非真實個案資料。最後更新：2026-09-29
+    </p>
+  </footer>
+
+</div>
+
+</body>
+</html>

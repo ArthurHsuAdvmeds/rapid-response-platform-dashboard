@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>三軍總醫院北投分院｜精神健康個案通報管理儀表板</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="canonical" href="prod/">
+
+<!--
+  轉址頁：repo 根目錄 → 正式版儀表板 prod/
+  原型（v1–v8，模擬資料）在 prototype/，不從這裡轉。
+  網址一律相對路徑：GitHub Pages 的子路徑（/rapid-response-platform-dashboard/）與本機 file:// 都能用；
+  file:// 下目錄網址只會列出檔案，所以要補上 index.html。
+-->
+<noscript><meta http-equiv="refresh" content="0; url=prod/index.html"></noscript>
+
+<style>
+  :root{ color-scheme: light dark; }
+  body{
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    font-family:"Microsoft JhengHei","Noto Sans TC",system-ui,sans-serif;
+    background:#fff; color:#242424;
+  }
+  @media (prefers-color-scheme:dark){ body{ background:#16191d; color:#e6e8ea; } }
+  .wrap{ text-align:center; padding:24px 16px; }
+  p{ margin:0 0 10px; font-size:14px; opacity:.8; }
+  a{ color:#238bd8; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <p>正在前往儀表板…</p>
+    <p>沒有自動跳轉？<a id="manual" href="prod/index.html">請點此進入</a></p>
+  </div>
+<script>
+  /* replace：不留歷史紀錄，返回鍵不會彈回這頁 */
+  location.replace(location.protocol === 'file:' ? 'prod/index.html' : 'prod/');
+</script>
+</body>
+</html>
