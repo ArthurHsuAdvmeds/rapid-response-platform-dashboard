@@ -301,7 +301,8 @@ footer{
     </p>
 
     <nav class="entries" aria-label="版本入口">
-      <a class="entry current" href="../v8/index.html"><b>V8</b><span>2026-11-05｜目前版本</span></a>
+      <a class="entry current" href="../v9/index.html"><b>V9</b><span>2026-11-09｜目前版本</span></a>
+      <a class="entry" href="../v8/index.html"><b>V8</b><span>2026-11-05</span></a>
       <a class="entry" href="../v7/index.html"><b>V7</b><span>2026-10-16</span></a>
       <a class="entry" href="../v6/index.html"><b>V6</b><span>2026-09-29</span></a>
       <a class="entry" href="../v5/index.html"><b>V5</b><span>2026-09-25</span></a>
@@ -320,6 +321,185 @@ footer{
     深色標籤是頁首下方主選單的頁面名稱，橘色標籤是頁面內的子頁籤或按鈕，灰色標籤是卡片或區塊名稱。
     依序點下去就會看到該項變更。
   </div>
+
+  <!-- ===================== V9 ===================== -->
+  <section class="release" id="v9">
+    <div class="release-head">
+      <h2 class="release-ver">V9</h2>
+      <span class="release-date">2026-11-09</span>
+      <span class="release-vs">相較 V8</span>
+    </div>
+    <p class="release-summary">
+      依「V9 調整」重整「醫療機構端處理成效分析」：指標分成「優化計畫專屬指標」與「共同指標」兩區，
+      新增優化計畫結案個案轉介率（含四項醫療資源轉介）、機構結案失聯率、機構結案拒訪率、已開案後每月門診／急診次數變化，
+      移除不在清單上的三項指標。畫面數字為原型模擬資料；其餘各頁內容與資料均未更動。
+    </p>
+
+    <div class="group">
+      <h3 class="group-title">醫療機構端處理成效分析</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">1</span>
+            <h3>指標分成「優化計畫專屬」與「共同指標」兩區<span class="tag move">版面調整</span></h3>
+          </div>
+          <p>
+            原本一整區七張卡片，改為左右兩區（平板與手機上下排），一眼看出哪些指標只屬於優化計畫、哪些緊急醫療也適用。
+          </p>
+          <div class="detail">
+            <ul>
+              <li><b>優化計畫專屬指標</b>（左）：只算優化計畫個案，選「全部」或「優化計畫」數字相同；選「緊急醫療」時整區隱藏</li>
+              <li><b>共同指標</b>（右）：緊急醫療與優化計畫都適用，數字依「通報類別分析」切換（V8 這三張卡不會跟著切換）</li>
+              <li>共同指標區最後一格是「指標計算說明」，按鈕開啟各指標的公式與資料來源</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">醫療機構端處理成效分析</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">通報類別分析：全部／緊急醫療／優化計畫</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">2</span>
+            <h3>新增「優化計畫結案個案轉介率」<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            大字是四項醫療資源轉介中任一項有轉介的比率（全部），下方四格是四項各自的比率。
+          </p>
+          <div class="detail">
+            <ul>
+              <li><b>計算方式</b>：結案個案轉介資源人數 ÷ 收案總人數；依結案訪視紀錄單「醫療資源轉介」的四個選項，任一項有轉介就計入分子</li>
+              <li><b>四項各自</b>：該項轉介人數 ÷ 收案總人數；一人可勾多項，四項相加會超過「任一項」</li>
+              <li>四個選項名稱暫用「門診、住院、居家治療、日間留院」，待確認</li>
+              <li>卡片標題用簡稱；完整名稱「疑似或社區精神病人照護優化計畫結案個案轉介率」列在指標計算說明，下兩項同</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">醫療機構端處理成效分析</span>
+            <span class="sep">›</span>
+            <span class="crumb">優化計畫專屬指標</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">3</span>
+            <h3>新增「優化計畫機構結案失聯率」「優化計畫機構結案拒訪率」<span class="tag new">新增</span></h3>
+          </div>
+          <div class="detail">
+            <ul>
+              <li><b>失聯率</b>：未完成處遇即失聯人數 ÷ 優化計畫收案人數</li>
+              <li><b>拒訪率</b>：未完成處遇即拒訪人數 ÷ 優化計畫收案人數</li>
+              <li>兩項都是不希望發生的情形，數字以橘色呈現</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">醫療機構端處理成效分析</span>
+            <span class="sep">›</span>
+            <span class="crumb">優化計畫專屬指標</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">4</span>
+            <h3>新增「已開案後個案每月使用門診／急診次數變化」<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            結案時次數 − 第一次評估訪視時次數（各個案相減後取平均），下方數線標出在 −3～+3 之間的位置。
+          </p>
+          <div class="detail">
+            <ul>
+              <li>急診次數減少標為綠色；門診次數的增減沒有定義好壞，只標方向（藍色）</li>
+              <li>與「精神症狀改善成效指標 › 後續醫療資源使用狀況」是同一組數字，成效頁仍保留</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">醫療機構端處理成效分析</span>
+            <span class="sep">›</span>
+            <span class="crumb">優化計畫專屬指標</span>
+          </div>
+          <div class="path">
+            <span class="path-label">對照</span>
+            <span class="crumb nav">精神症狀改善成效指標</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">後續醫療資源使用狀況</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">5</span>
+            <h3>移除不在清單上的三項指標<span class="tag fix">移除</span></h3>
+          </div>
+          <p>
+            下列三項不在 V9 清單上，從本頁移除（前兩項在「醫院內控指標(SNQ)」仍有）；「優化計畫無法收案」照舊。
+          </p>
+          <div class="detail">
+            <ul>
+              <li>緊急醫療結案後轉介至本院醫療系統比例</li>
+              <li>優化計畫結案後轉介至本院醫療系統比例</li>
+              <li>結案追蹤率</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">醫療機構端處理成效分析</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">6</span>
+            <h3>「指標計算說明」改列本頁九項指標<span class="tag fix">修正</span></h3>
+          </div>
+          <p>
+            標題由「HIS 指標計算說明」改為「指標計算說明」，依兩區分組，列出九項指標的完整名稱、公式與資料來源（平台／HIS）。
+          </p>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">醫療機構端處理成效分析</span>
+            <span class="sep">›</span>
+            <span class="crumb">指標計算說明</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">各指標公式與資料來源</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="open-questions">
+      <h3>待確認事項</h3>
+      <ol>
+        <li>
+          <b>醫療資源轉介的四個選項名稱。</b>
+          目前暫用門診、住院、居家治療、日間留院，請提供結案訪視紀錄單上的實際選項。
+        </li>
+        <li>
+          <b>成效頁「後續醫療資源使用狀況」是否保留。</b>
+          本頁的每月門診／急診次數變化與已結案後三項，和該子頁籤是同一組指標，目前兩頁都有。
+        </li>
+        <li>
+          <b>「未完成處遇」的認定。</b>
+          失聯率、拒訪率是否就是結案訪視紀錄單結案原因為「失聯」「拒訪」的人數，還是另有條件（例如服務未滿 3 個月）？
+        </li>
+        <li>
+          <b>日期區間依哪個日期篩選。</b>
+          轉介率、失聯率、拒訪率的分母是收案人數、分子是結案個案，選日期區間時以收案（開案）日還是結案日為準？
+        </li>
+        <li>
+          <b>每月門診次數變化的好壞方向。</b>
+          門診次數增加是否算改善？確認後比照急診標示顏色。
+        </li>
+      </ol>
+    </div>
+  </section>
 
   <!-- ===================== V8 ===================== -->
   <section class="release" id="v8">

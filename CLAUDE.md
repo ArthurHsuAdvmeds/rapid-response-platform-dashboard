@@ -19,7 +19,8 @@
 | --- | --- | --- | --- |
 | `index.html` | 轉址到 `prod/` | ✓ | — |
 | `prod/` | 正式版：`index.html`（以原型 v7 為基礎，只保留緊急醫療，數字由資料即時計算）＋ `data.json`（排程主機定期 push） | ✓ | [prod/CLAUDE.md](prod/CLAUDE.md)、[prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md) |
-| `prototype/` | `v1/`–`v8/` 原型（最新 `v8/`）、`release-note/`、轉址頁 `index.html` | ✓ | [prototype/CLAUDE.md](prototype/CLAUDE.md) |
+| `prototype/` | `v1/`–`v9/` 原型（最新 `v9/`）、`release-note/`、轉址頁 `index.html` | ✓ | [prototype/CLAUDE.md](prototype/CLAUDE.md) |
+| `V9調整.md` | 客戶對 v9「醫療機構端處理成效分析」的調整清單（v9 的需求來源） | 使用者決定 | — |
 | `kpi/` | `kpi.csv` 指標清單、`original_list.xlsx` 客戶原始清單。**只留本機**，不要 `git add -f` | ✗（`.gitignore`） | 第 6 節 |
 | `.github/workflows/pages.yml` | Pages 部署 | ✓ | **不要改**，除非使用者明確要求 |
 
