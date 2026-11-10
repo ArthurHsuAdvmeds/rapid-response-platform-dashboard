@@ -22641,25 +22641,30 @@ html body .dashboard #hospital.page .hospital-his-card.delta.v9-neutral > strong
 html body .dashboard #hospital.page .hospital-his-card.delta.v9-neutral .hospital-his-trend{ color:#526071 !important; }
 
 /* 轉介率的四個選項：數字是該項人數 ÷ 收案總人數。
-   V9 追加改成正式名稱後最長 8 個字（社區心理衛生中心），原本的兩欄小格在 1200–1920px 都會被截斷 → 一列一項。
-   這張卡的高度決定整列卡片的高度（1536×730 已經滿了），所以不畫進度條，由四項明細取代，卡片高度不變 */
+   V9 追加改成正式名稱後最長 8 個字（社區心理衛生中心），原本的兩欄小格在 1200–1920px 都會被截斷 → 一列一項，不畫進度條。
+   間距：每列上下留 2px、列與列隔 4px（原本 0／1px 太擠）。
+   頁面高度依內容的尺寸（1536×864／730、1366×657、平板、手機）這張卡是整列最高的，會把兩列卡片一起撐高，1536 寬整頁約多 50px；
+   1920×1080 這類鎖高的尺寸卡片下方有空白，清單往下撐、每列放大到 2.2em 為止 */
 html body .dashboard #hospital.page .v9-referral-card .hospital-his-bar{ display:none !important; }
 html body .dashboard #hospital.page .v9-referral-split{
   list-style:none;
+  flex:1 0 auto;
   margin:4px 0 0;
   padding:0;
-  display:grid;
-  grid-template-columns:minmax(0,1fr);
-  gap:1px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
 }
 html body .dashboard #hospital.page .v9-referral-split li{
+  flex:1 0 auto;
+  max-height:2.2em;
   min-width:0;
   display:flex;
-  align-items:baseline;
+  align-items:center;
   justify-content:space-between;
   gap:8px;
   margin:0;
-  padding:0 8px;
+  padding:2px 8px;
   border-radius:4px;
   background:#eef5fd;
   color:#526071;
