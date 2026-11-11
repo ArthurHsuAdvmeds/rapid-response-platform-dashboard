@@ -11,6 +11,7 @@ qa 版儀表板（本 repo 的 `qa/`）要拿到什麼資料、放在哪裡、�
   | `qa/data.json` | 緊急醫療 `emg[]`、優化計畫 `opt[]`，一筆通報一個物件 | `schemaVersion: 2` | [data.template.jsonc](data.template.jsonc) |
   | `qa/data-platform.json` | 醫院內控指標（SNQ）`snq`、平台使用率 `usage` 的彙總數字 | `schemaVersion: 1` | [data-platform.template.jsonc](data-platform.template.jsonc) |
 
+- **qa 目前隱藏醫院內控指標與平台使用率，不讀 `data-platform.json`**（使用者 2026-11-11 指示）：平台專案可以先只產生 `data.json`，`data-platform.json` 的格式（第 4 節）保留，恢復時照用。
 - **每個欄位的意義、型別、代碼都寫在兩個範本的註解裡，以範本為準**；這份只寫規則、代碼表、欄位與指標的對應、待確認事項。
 - 目前 `qa/` 裡的兩個檔是虛構的範例資料（最外層 `"sample": true`，頁首顯示「範例資料（虛構）」），平台專案產生正式檔後直接覆蓋。
 - 標 ★ 的是還沒確認的地方，問題集中在第 6 節。
@@ -136,10 +137,10 @@ HIS 的身分證比對在平台專案做完，檔案裡只放比對後的次數�
 | 精神症狀改善成效指標 | `scores`、`followUp`、`his`；opt `monthlyUse` |
 | 通報者基本資料分析 | `reporterDepartment`、`status`、`StatisfactionAvg` |
 | 醫療機構端處理成效分析 | opt `hospital`、`closing`、`monthlyUse`；`his` |
-| 醫院內控指標(SNQ) | `data-platform.json` 的 `snq` |
+| 醫院內控指標(SNQ) | `data-platform.json` 的 `snq`（**qa 目前隱藏這頁**，不讀這個檔） |
 | 指揮儀表板｜指揮板、結案率 | `reportedAt`、`status`、`assignedAt`、`optType` |
 | ｜同期比較 | 效率頁的所有欄位（**qa 目前隱藏這個子頁籤**：平台 2026/10/05 起才有資料，還沒有往年可比，比照 prod） |
-| ｜平台使用率 | `data-platform.json` 的 `usage` |
+| ｜平台使用率 | `data-platform.json` 的 `usage`（**qa 目前隱藏這個子頁籤**，不讀這個檔） |
 | AI模型預測準確率 | `ai`（**qa 目前隱藏這頁**，資料可以先給） |
 
 ---

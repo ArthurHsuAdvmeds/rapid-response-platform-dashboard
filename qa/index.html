@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>三軍總醫院北投分院｜精神健康個案通報管理儀表板｜QA</title>
 <meta name="robots" content="noindex, nofollow">
-<!-- qa：V9 版面接真實資料（驗證用，驗證後再更新到 prod）。數字由同資料夾的 data.json 與 data-platform.json 計算，見檔尾 <style id="qa-data">／<script id="qa-data"> 與 DATA_CONTRACT.md -->
+<!-- qa：V9 版面接真實資料（驗證用，驗證後再更新到 prod）。數字由同資料夾的 data.json 與 data-platform.json 計算（後者的兩處目前隱藏、不讀，見 SHOW_PLATFORM），見檔尾 <style id="qa-data">／<script id="qa-data"> 與 DATA_CONTRACT.md -->
 <style>
   :root{
     --blue:#40a5f3;
@@ -12095,7 +12095,9 @@
     <!-- <button class="tab" data-page="ai">AI模型預測準確率</button> -->
     <button class="tab" data-page="reporter">通報者基本資料分析</button>
     <button class="tab" data-page="hospital">醫療機構端處理成效分析</button>
-    <button class="tab" data-page="snq">醫院內控指標(SNQ)</button>
+    <!-- qa：醫院內控指標先隱藏（使用者 2026-11-11 指示，與平台使用率一起，兩者都讀 data-platform.json）；
+         要恢復就把下一行還原成按鈕、拿掉 #snq 的 hidden，並把 qa-data 的 SHOW_PLATFORM 改成 true -->
+    <!-- <button class="tab" data-page="snq">醫院內控指標(SNQ)</button> -->
     <button class="tab" data-page="command">指揮儀表板</button>
   </nav>
 
@@ -13146,8 +13148,8 @@
     </dialog>
   </section>
 
-  <!-- 8: Hospital internal control indicators -->
-  <section class="page" id="snq">
+  <!-- 8: Hospital internal control indicators（qa：先隱藏，見主選單按鈕旁的註解） -->
+  <section class="page" id="snq" hidden>
     <div class="command-filter-card page-time-filter" id="snqTimeFilter">
       <div class="command-date-filter">
         <label>
@@ -13326,7 +13328,8 @@
       <button type="button" class="command-view-tab" data-command-view="closure" role="tab" aria-selected="false">結案率</button>
       <!-- 同期比較先隱藏（比照 prod：平台 2026/10/05 起才有資料，還沒有往年可比）。程式與 #commandComparisonView 都保留，恢復時拿掉這段註解即可 -->
       <!-- <button type="button" class="command-view-tab" data-command-view="comparison" role="tab" aria-selected="false">同期比較</button> -->
-      <button type="button" class="command-view-tab" data-command-view="usage" role="tab" aria-selected="false">平台使用率</button>
+      <!-- 平台使用率先隱藏（使用者 2026-11-11 指示，與醫院內控指標一起）。#commandUsageView 與 renderUsage() 都保留，恢復時拿掉這段註解，並把 qa-data 的 SHOW_PLATFORM 改成 true -->
+      <!-- <button type="button" class="command-view-tab" data-command-view="usage" role="tab" aria-selected="false">平台使用率</button> -->
     </div>
 
     <div class="command-view active" id="commandFlowView" data-command-panel="flow">
@@ -22809,11 +22812,13 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
   }
 }
 
-/* AI模型預測準確率先隱藏：主選單少一顆，≥1200px 由 9 欄改 8 欄（900–1199px 原本就是 4 欄兩列） */
+/* AI模型預測準確率、醫院內控指標(SNQ) 先隱藏：主選單少兩顆，≥1200px 由 9 欄改 7 欄（900–1199px 原本就是 4 欄兩列，第二列剩 3 顆）。
+   恢復其中一頁時欄數加 1 */
 @media (min-width:1200px){
-  .tabs{ grid-template-columns:repeat(8,1fr) !important; }
+  .tabs{ grid-template-columns:repeat(7,1fr) !important; }
 }
-.dashboard #ai.page[hidden]{ display:none !important; }
+.dashboard #ai.page[hidden],
+.dashboard #snq.page[hidden]{ display:none !important; }
 
 /* 風險頁：某量表在區間內沒有任何初評資料 */
 #risk .risk-stack.rd-empty{ align-items:center; justify-content:center; }
@@ -22927,6 +22932,8 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
      格式以同資料夾 data.template.jsonc 與 DATA_CONTRACT.md 為準。schemaVersion 1（prod 的舊格式，只有 emg）也讀得懂。
    ・data-platform.json（schemaVersion 1）：醫院內控指標 snq 與平台使用率 usage 的彙總數字；
      這個檔載入失敗只影響那兩處，頁首提示，其他頁照常。
+     ★ 目前這兩處都隱藏（使用者 2026-11-11 指示），SHOW_PLATFORM=false：不讀這個檔，頁首也不顯示它的提示與範例標籤；
+       renderSnq()／renderUsage() 照常執行（畫成「尚無資料」）。恢復時改成 true，並還原主選單與子頁籤的按鈕。
    ・normalizeCase() 把兩種通報轉成同一種案件物件，各頁 render*() 只讀案件物件。
      data.json 改欄位名或代碼時，只改 normalizeCase() 與下面的代碼表。
    ・日期篩選一律以通報時間（timePoint.reportedAt）的臺北日期為準，含頭尾；結案率不受日期篩選影響。
@@ -22940,6 +22947,8 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
 
   const DATA_FILE='data.json';
   const PLATFORM_FILE='data-platform.json';
+  /* 醫院內控指標、平台使用率先隱藏（2026-11-11）：false＝不讀 data-platform.json（檔案不存在也不會有 404 或頁首提示） */
+  const SHOW_PLATFORM=false;
   /* 2＝緊急醫療＋優化計畫；1＝prod 的舊格式（只有 emg），讀得懂，方便拿正式資料對照 */
   const SCHEMA_VERSIONS=[1,2];
   const PLATFORM_SCHEMA_VERSION=1;
@@ -23106,7 +23115,9 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
   async function loadFromServer(){
     const [dataText,platform]=await Promise.all([
       fetchText(DATA_FILE),
-      fetchText(PLATFORM_FILE).then(t=>({ obj:parseJsonLoose(t,PLATFORM_FILE) }),err=>({ error:err.message || String(err) }))
+      SHOW_PLATFORM
+        ? fetchText(PLATFORM_FILE).then(t=>({ obj:parseJsonLoose(t,PLATFORM_FILE) }),err=>({ error:err.message || String(err) }))
+        : {}
     ]);
     return { raw:parseJsonLoose(dataText,DATA_FILE), platform:platform.obj || null, platformError:platform.error || null };
   }
@@ -23121,7 +23132,9 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
       else if(obj && (obj.snq || obj.usage)) platform=obj;
       else throw new Error(`看不出 ${f.name} 是 data.json 還是 data-platform.json`);
     }
-    if(!raw) throw new Error('請選取 data.json（可以同時選 data-platform.json）');
+    if(!raw) throw new Error(SHOW_PLATFORM ? '請選取 data.json（可以同時選 data-platform.json）' : '請選取 data.json');
+    /* SHOW_PLATFORM=false：選了 data-platform.json 也不用 */
+    if(!SHOW_PLATFORM) return { raw, platform:null, platformError:null };
     return { raw, platform, platformError:platform ? null : `未選取 ${PLATFORM_FILE}` };
   }
 
@@ -24329,7 +24342,7 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
     const why=err ? `資料載入失敗：${esc(err.message || err)}。` : '以 file:// 直接開檔時，瀏覽器不允許網頁自動讀取同資料夾的 data.json。';
     el.classList.add('rd-error');
     el.innerHTML=`<span>${why}</span>`
-      +'<label class="rd-pick">選擇 data.json（可一併選 data-platform.json）<input type="file" multiple accept=".json,.jsonc,application/json"></label>'
+      +`<label class="rd-pick">選擇 data.json${SHOW_PLATFORM ? '（可一併選 data-platform.json）' : ''}<input type="file" multiple accept=".json,.jsonc,application/json"></label>`
       +(local ? '<span>或改用本機伺服器開啟（例如 VS Code Live Server）。</span>' : '');
     el.querySelector('input').addEventListener('change',e=>{
       if(e.target.files.length) loadFromPicker(e.target.files).then(start).catch(showError);
