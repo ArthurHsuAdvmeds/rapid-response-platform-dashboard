@@ -15417,8 +15417,8 @@ document.addEventListener('DOMContentLoaded', () => {
       '暫不轉介案件醫療介入率':'衛生局不轉介醫療機構但本院開案件數 / 衛生局不轉介案件數。',
       '暫不轉介案件覆核時間':'「系統」本院完成不轉介覆核單時間，減掉「系統」衛生局完成優化計畫回覆單時間。',
       '轉介案件派案時間':'「系統」完成醫師／護理師指派時間，減掉「系統」衛生局完成優化計畫回覆單時間。',
-      '轉介案件首次聯繫時間':'「醫療機構回覆單」中填寫的「進行聯繫時間」，減掉「系統」衛生局完成優化計畫回覆單時間。',
-      '派案後首次聯繫時間':'「醫療機構回覆單」中填寫的「進行聯繫時間」，減掉「系統」完成醫師／護理師指派時間。',
+      '轉介案件首次聯繫時間':'「系統」第一份評估訪視紀錄單的填寫時間，減掉「系統」轉介單的填寫時間。第一～三類都算。',
+      '派案後首次聯繫時間':'「系統」第一份評估訪視紀錄單的填寫時間，減掉「系統」完成醫師／護理師指派時間。第一～三類都算。',
       '首次專業評估時間':'醫療填寫在評估階段訪視紀錄單中的「訪視日期時間-開始」，減掉「系統」完成醫師／護理師指派時間。',
       '回覆衛生局時間':'「系統」醫療完成「醫療機構回覆單」的時間，減掉「系統」完成「指派醫師/護理師」的時間。',
       '高風險個案處理時間(平均)':'緊醫高風險個案完成受理 OR 優化計畫完成首次訪視時間 - 高風險個案通報時間。',
@@ -23535,7 +23535,8 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
     v.nonReferralIntervention=pct(count(hold,c=>c.opened===true),hold.length);
     v.reviewTime=spanAvg(hold,'bureauReplied','reviewed',DAY);
     v.referralAssign=spanAvg(tsgh,'bureauReplied','assigned',HOUR);
-    v.referralContact=spanAvg(tsgh,'bureauReplied','contact',HOUR);
+    /* 轉介案件首次聯繫：首次聯繫（第一份評估訪視紀錄單的填寫時間）減轉介單填寫時間（reportedAt），第一～三類都算（使用者 2026-11-11） */
+    v.referralContact=spanAvg(opt,'reported','contact',HOUR);
     v.afterAssignContact=spanAvg(opt,'assigned','contact',HOUR);
     v.firstProfessional=spanAvg(opt,'assigned','firstVisit',DAY);
     v.replyBureau=spanAvg(opt,'assigned','hospitalReplied',DAY);

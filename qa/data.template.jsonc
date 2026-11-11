@@ -97,10 +97,10 @@
         "dispatchDate": "2026-10-13"           // 回覆單填寫的「派案日期」
       },
       "review": null,                          // 不轉介覆核單：{ "result": 1 同意 | 2 駁回 }；沒有覆核 null
-      "hospital": {                            // 醫療機構回覆單；還沒回覆整塊 null
-        "opened": true,                        // true 開案、false 無法收案
+      "hospital": {                            // 醫療機構回覆單（第三類是「是否開案」）與首次聯繫；兩者都還沒有才整塊 null
+        "opened": true,                        // true 開案、false 無法收案；還沒回覆 null
         "unableReason": null,                  // 無法收案原因（回覆單上的選項文字，例如「住院」「拒訪」「未轉介」）
-        "contactAt": "2026-10-14T15:30:00"     // 回覆單填寫的「進行聯繫時間」
+        "contactAt": "2026-10-17T18:20:00"     // 首次聯繫：第一份評估訪視紀錄單的填寫時間（系統時間，第一～三類都有）；還沒填 null
       },
       "monthlyUse": {                          // 每月使用門診／急診次數（訪視紀錄單）
         "first": { "opd": 2, "er": 1 },        // 第一次評估訪視
@@ -140,7 +140,7 @@
       "StatisfactionAvg": null,
       "bureau": { "result": 3, "noReferralReason": "個案拒絕醫療服務", "visitDate": "2027-09-21", "dispatchDate": null },
       "review": { "result": 2 },
-      "hospital": { "opened": true, "unableReason": null, "contactAt": "2027-09-23T14:10:00" },
+      "hospital": { "opened": true, "unableReason": null, "contactAt": "2027-09-28T15:05:00" },
       "monthlyUse": { "first": { "opd": 0, "er": 2 }, "closing": null },
       "closing": null,
       "scores": { "initial": { "CTRS": 6, "GAF": 58, "BSRS5": 8, "CGIS": 3 }, "m3": null, "m6": null },
