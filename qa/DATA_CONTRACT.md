@@ -9,9 +9,10 @@ qa 版儀表板（本 repo 的 `qa/`）要拿到什麼資料、放在哪裡、�
   | 檔案 | 內容 | 格式版本 | 欄位範本 |
   | --- | --- | --- | --- |
   | `qa/data.json` | 緊急醫療 `emg[]`、優化計畫 `opt[]`，一筆通報一個物件 | `schemaVersion: 2` | [data.template.jsonc](data.template.jsonc) |
-  | `qa/data-platform.json` | 醫院內控指標（SNQ）`snq`、平台使用率 `usage` 的彙總數字 | `schemaVersion: 1` | [data-platform.template.jsonc](data-platform.template.jsonc) |
+  | `qa/data-platform.json` | 醫院內控指標（SNQ）`snq`、平台使用率 `usage` 的彙總數字；AI模型預測準確率的預測比對 `ai` | `schemaVersion: 1` | [data-platform.template.jsonc](data-platform.template.jsonc) |
 
-- **qa 目前隱藏醫院內控指標與平台使用率，不讀 `data-platform.json`**（使用者 2026-11-11 指示）：平台專案可以先只產生 `data.json`，`data-platform.json` 的格式（第 4 節）保留，恢復時照用。
+- **AI 預測放在 `data-platform.json`，不在 `data.json`**（使用者 2026-11-11 指示）。
+- **qa 目前隱藏醫院內控指標、平台使用率（2026-11-11）與 AI模型預測準確率（2026-11-09），不讀 `data-platform.json`**：平台專案可以先只產生 `data.json`，`data-platform.json` 的格式（第 4 節）保留，恢復時照用。
 - **每個欄位的意義、型別、代碼都寫在兩個範本的註解裡，以範本為準**；這份只寫規則、代碼表、欄位與指標的對應、待確認事項。
 - 目前 `qa/` 裡的兩個檔是虛構的範例資料（最外層 `"sample": true`，頁首顯示「範例資料（虛構）」），平台專案產生正式檔後直接覆蓋。
 - 標 ★ 的是還沒確認的地方，問題集中在第 6 節。
@@ -29,7 +30,7 @@ qa 的資料比 prod 多（優化計畫、量表分數、HIS 比對結果），�
 
 1. **兩個檔各自是全量快照**：每次都整份重產、整份覆寫，不做增量、不跟舊檔合併。
 2. **每次執行都更新兩個檔的 `updatedAt` 並 push**（就算內容沒變）。儀表板以 `data.json` 的 `updatedAt` 當「今天」，距今超過 48 小時頁首會提示「資料已 N 天未更新」。
-3. **兩個檔可以分開產生、分開推**（例如 SNQ 由另一支程式每週跑）。`data-platform.json` 讀不到或格式錯，只有醫院內控指標與平台使用率顯示「尚無資料」，頁首提示，其他頁照常。
+3. **兩個檔可以分開產生、分開推**（例如 SNQ 由另一支程式每週跑）。`data-platform.json` 讀不到或格式錯，只有醫院內控指標、平台使用率、AI模型預測準確率顯示「尚無資料」，頁首提示，其他頁照常。
 4. **push 前先檢查，不過就不要推**（保留上一版、發告警）：
    - 標準 JSON（不要註解、不要結尾逗號）；`schemaVersion` 正確；`emg`、`opt` 是陣列；
    - 每筆都有 `reportId`（emg 與 opt 之間也不能重複）與可解析的 `timePoint.reportedAt`；`opt` 每筆都有 `optType`（1／2／3）；
@@ -46,7 +47,7 @@ qa 的資料比 prod 多（優化計畫、量表分數、HIS 比對結果），�
 - UTF-8（不要 BOM）、LF 換行；建議一筆通報一行、依 `timePoint.reportedAt` 排序、欄位順序照範本，git diff 才只會出現有變動的那幾筆。
 - 大小：v2 每筆約 0.9 KB，每年約 400 筆 ≈ 0.35 MB，十年內都不用拆。
 - **為什麼是這兩個檔**：同一支程式、同一個來源（平台的通報資料）放同一個檔，用 `emg`／`opt` 分類；
-  SNQ 與平台使用率另外抓、更新頻率可能不同，所以另開 `data-platform.json`（使用者指定）。不依實體拆（人、量表、時間點、代碼表各一個檔只會多出 join）。
+  SNQ 與平台使用率另外抓、更新頻率可能不同，所以另開 `data-platform.json`（使用者指定）；AI 預測也放這個檔（使用者 2026-11-11 指定）。不依實體拆（人、量表、時間點、代碼表各一個檔只會多出 join）。
   之後若有第三個來源，比照 `data-platform.json` 另開一個檔，外框同樣有 `schemaVersion`、`updatedAt`。
 
 ---
@@ -61,7 +62,8 @@ qa 的資料比 prod 多（優化計畫、量表分數、HIS 比對結果），�
 - **emg**：prod 版（schemaVersion 1）的欄位全部沿用，新增 `timePoint.closedAt` 與下面的共用區塊。
 - **opt**：共用欄位與 emg 同名同代碼（`reportId`、`reporterDepartment`、`caseInfo`、`assess`、`timePoint.reportedAt`／`assignedAt`／`closedAt`、`status`、`StatisfactionAvg`），
   另有 `optType`、`timePoint.bureauRepliedAt`／`reviewedAt`／`hospitalRepliedAt`／`firstVisitAt`、`bureau`、`review`、`hospital`、`monthlyUse`、`closing`。
-- **共用區塊**（emg、opt 都有，還沒有資料的整塊給 `null`）：`scores`（量表原始分數：初評、結案後 3／6 個月）、`followUp`（追蹤量表填寫狀況）、`his`（HIS 比對結果）、`ai`（AI 預測）。
+- **共用區塊**（emg、opt 都有，還沒有資料的整塊給 `null`）：`scores`（量表原始分數：初評、結案後 3／6 個月）、`followUp`（追蹤量表填寫狀況）、`his`（HIS 比對結果）。
+  AI 預測不放通報裡，放 `data-platform.json` 的 `ai`（第 4 節）；通報裡就算有 `ai`，儀表板也不讀。
 - 時間 `YYYY-MM-DDTHH:mm:ss`，不帶時區＝臺北時間；`bureau.visitDate`、`bureau.dispatchDate` 可以只有日期（只有日期時以通報日起算的天數計，同一天＝0）。
 
 ### 3.1 代碼表
@@ -92,6 +94,8 @@ qa 的資料比 prod 多（優化計畫、量表分數、HIS 比對結果），�
 - **`usage.units[]`**：每個單位的總帳號數 `total`、帳號建立後曾登入過的帳號數 `loggedIn`。統計到 `updatedAt` 為止，不受日期篩選影響；顯示時依使用率排序。只放彙總，不放帳號明細。
 - **`snq.months[]`**：每月一列，各指標的分子 `num`／分母 `den`，以及兩類通報的結案後轉介（`den`、`any`、`opd`、`home`、`ipd`）。
   儀表板把日期區間涵蓋到的月份**加總分子、加總分母再相除**，所以兩者都必須是可以相加的人數；「月份」是個案進入該指標母群的月份 ★。只放彙總，不放個案。
+- **`ai.predictions[]`**：一筆預測一個物件，`date`（預測日期）、`predicted`（AI 預測分數 3–15）、`actual`（專業人員實測分數 3–15，還沒實測 `null`）、`modelVersion`。全量快照，不受日期篩選影響。
+  散布圖與相關係數只用預測、實測都有的筆數；「吻合程度變化」依各模型版本第一次出現的 `date` 排先後、逐版累積。**不放 `reportId` 或任何個案欄位**（儀表板不需要把預測對回通報）。
 
 ---
 
@@ -141,7 +145,7 @@ HIS 的身分證比對在平台專案做完，檔案裡只放比對後的次數�
 | 指揮儀表板｜指揮板、結案率 | `reportedAt`、`status`、`assignedAt`、`optType` |
 | ｜同期比較 | 效率頁的所有欄位（近三年相同期間；平台 2026/10/05 以前的年份顯示「平台未啟用」，不需要補舊資料） |
 | ｜平台使用率 | `data-platform.json` 的 `usage`（**qa 目前隱藏這個子頁籤**，不讀這個檔） |
-| AI模型預測準確率 | `ai`（**qa 目前隱藏這頁**，資料可以先給） |
+| AI模型預測準確率 | `data-platform.json` 的 `ai.predictions`（**qa 目前隱藏這頁**，不讀這個檔） |
 
 ---
 
@@ -151,3 +155,4 @@ HIS 的身分證比對在平台專案做完，檔案裡只放比對後的次數�
 - **qa 通過後**：qa 的版面與資料層換到 prod，prod 改讀 v2 的兩個檔；這份規格取代 prod 版。
 - 之後改格式：新增選填欄位不用改版號；改名、刪欄位、改代碼意義 → `schemaVersion` 加 1，先讓儀表板同時支援新舊版本並上線，平台再切換。每次都先改範本與這份文件。
 - v2 還沒有正式產出過，所以 V9 追加（2026-11-09）直接改在 v2、不加版號：`bureau.result` 的 `2` 改為轉介松德院區、`closing.referrals` 改放代碼、拿掉 `dataStart` 與 `options.referral`。
+- 同樣的理由，2026-11-11 把 AI 預測從 `data.json` 每筆通報的 `ai` 移到 `data-platform.json` 的 `ai.predictions`，兩個檔都不加版號。

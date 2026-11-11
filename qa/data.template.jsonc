@@ -3,12 +3,13 @@
 // -----------------------------------------------------------------------------
 // 給平台專案產生 qa/data.json 用：欄位意義寫在註解，規則與代碼表見同資料夾 DATA_CONTRACT.md。
 // ・實際檔案輸出「標準 JSON」：不要註解、不要結尾逗號（儀表板讀得懂註解，驗證工具不一定）。
-// ・醫院內控指標（SNQ）與指揮儀表板「平台使用率」不在這個檔，在 data-platform.json。
+// ・醫院內控指標（SNQ）、指揮儀表板「平台使用率」、AI模型預測準確率不在這個檔，在 data-platform.json（qa 目前隱藏這三處、不讀那個檔）。
 // ・每次都是全量快照：emg、opt 放平台上「全部」通報，不限日期、不做增量。
 // ・沒有的值給 null；陣列沒有資料給 []；整塊還沒有資料（例如還沒接 HIS）的子物件給 null。
 // ・時間 YYYY-MM-DDTHH:mm:ss（不帶時區＝臺北時間）；日期 YYYY-MM-DD。
 // ・★ 是還沒跟平台確認的地方，問題清單在 DATA_CONTRACT.md 第 6 節。
 // ・平台起始日固定 2026/10/05（寫在儀表板裡，不用給）；早於這天的通報儀表板不列入。
+//   指揮儀表板「同期比較」比近三年，這天以前的年份顯示「平台未啟用」，不用補舊資料。
 //   這份範本的 updatedAt 假設在 2027/09/30，結案後 3／6 個月追蹤等欄位才有值可以示範。
 // =============================================================================
 {
@@ -63,11 +64,6 @@
         "ipdAfter": 0,                         // 結案後住院次數
         "psyOpdAfter": 4,                      // 結案後身心科門診使用次數
         "homeOpdAfter": 1                      // 結案後居家照護科門診使用次數
-      },
-      "ai": {                                  // AI 模型預測（AI模型預測準確率）；沒有預測 null
-        "predicted": 9,                        // AI 模型預測分數（3–15）
-        "actual": 10,                          // 專業人員實測分數（3–15）；還沒評估 null
-        "modelVersion": "1.2"                  // 預測時用的模型版本（吻合程度變化依版本累積）
       }
     }
   ],
@@ -122,8 +118,7 @@
         "m6": { "CTRS": 7, "GAF": 52, "BSRS5": 9, "CGIS": 4 }
       },
       "followUp": { "m3": "trackable", "m6": "trackable" },
-      "his": { "ipdBefore": 2, "opdBefore": 4, "ipdAfter": 1, "psyOpdAfter": 6, "homeOpdAfter": 2 },
-      "ai": { "predicted": 12, "actual": 11, "modelVersion": "1.2" }
+      "his": { "ipdBefore": 2, "opdBefore": 4, "ipdAfter": 1, "psyOpdAfter": 6, "homeOpdAfter": 2 }
     },
     {
       // 例二：衛生局暫不轉介 → 本院覆核駁回後仍開案（暫不轉介案件醫療介入）→ 尚未結案
@@ -150,8 +145,7 @@
       "closing": null,
       "scores": { "initial": { "CTRS": 6, "GAF": 58, "BSRS5": 8, "CGIS": 3 }, "m3": null, "m6": null },
       "followUp": { "m3": null, "m6": null },
-      "his": null,
-      "ai": { "predicted": 7, "actual": null, "modelVersion": "1.3" }
+      "his": null
     }
   ]
 }

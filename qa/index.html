@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>三軍總醫院北投分院｜精神健康個案通報管理儀表板｜QA</title>
 <meta name="robots" content="noindex, nofollow">
-<!-- qa：V9 版面接真實資料（驗證用，驗證後再更新到 prod）。數字由同資料夾的 data.json 與 data-platform.json 計算（後者的兩處目前隱藏、不讀，見 SHOW_PLATFORM），見檔尾 <style id="qa-data">／<script id="qa-data"> 與 DATA_CONTRACT.md -->
+<!-- qa：V9 版面接真實資料（驗證用，驗證後再更新到 prod）。數字由同資料夾的 data.json 與 data-platform.json 計算（後者供醫院內控指標、平台使用率、AI 頁，三處目前都隱藏、不讀，見 SHOW_PLATFORM／SHOW_AI），見檔尾 <style id="qa-data">／<script id="qa-data"> 與 DATA_CONTRACT.md -->
 <style>
   :root{
     --blue:#40a5f3;
@@ -10881,7 +10881,7 @@
     return x - Math.floor(x);
   }
 
-  /* qa：比對資料改由 qa-data 模組提供（data.json 的 ai，預測與實測分數都有的個案）；資料還沒載入時是空陣列 */
+  /* qa：比對資料改由 qa-data 模組提供（data-platform.json 的 ai.predictions，預測與實測分數都有的筆數）；資料還沒載入時是空陣列 */
   function buildAiPairs(){
     return window.RD && RD.loaded ? RD.aiPairs() : [];
   }
@@ -12091,11 +12091,12 @@
     <button class="tab" data-page="risk">通報案件風險分析</button>
     <button class="tab" data-page="efficiency">案件處理效率指標</button>
     <button class="tab" data-page="outcome">精神症狀改善成效指標</button>
-    <!-- qa：AI模型預測準確率先隱藏（使用者 2026-11-09 指示）；要恢復就把下一行還原成按鈕，並拿掉 #ai 的 hidden -->
+    <!-- qa：AI模型預測準確率先隱藏（使用者 2026-11-09 指示；比對資料在 data-platform.json 的 ai）；
+         要恢復就把下一行還原成按鈕、拿掉 #ai 的 hidden，並把 qa-data 的 SHOW_AI 改成 true -->
     <!-- <button class="tab" data-page="ai">AI模型預測準確率</button> -->
     <button class="tab" data-page="reporter">通報者基本資料分析</button>
     <button class="tab" data-page="hospital">醫療機構端處理成效分析</button>
-    <!-- qa：醫院內控指標先隱藏（使用者 2026-11-11 指示，與平台使用率一起，兩者都讀 data-platform.json）；
+    <!-- qa：醫院內控指標先隱藏（使用者 2026-11-11 指示，與平台使用率一起，兩者與 AI 頁都讀 data-platform.json）；
          要恢復就把下一行還原成按鈕、拿掉 #snq 的 hidden，並把 qa-data 的 SHOW_PLATFORM 改成 true -->
     <!-- <button class="tab" data-page="snq">醫院內控指標(SNQ)</button> -->
     <button class="tab" data-page="command">指揮儀表板</button>
@@ -22935,16 +22936,17 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
    -------------------------------------------------------------------------
    ・data.json（schemaVersion 2）：緊急醫療 emg[]、優化計畫 opt[]，一筆通報一個物件；
      格式以同資料夾 data.template.jsonc 與 DATA_CONTRACT.md 為準。schemaVersion 1（prod 的舊格式，只有 emg）也讀得懂。
-   ・data-platform.json（schemaVersion 1）：醫院內控指標 snq 與平台使用率 usage 的彙總數字；
-     這個檔載入失敗只影響那兩處，頁首提示，其他頁照常。
-     ★ 目前這兩處都隱藏（使用者 2026-11-11 指示），SHOW_PLATFORM=false：不讀這個檔，頁首也不顯示它的提示與範例標籤；
-       renderSnq()／renderUsage() 照常執行（畫成「尚無資料」）。恢復時改成 true，並還原主選單與子頁籤的按鈕。
+   ・data-platform.json（schemaVersion 1）：醫院內控指標 snq、平台使用率 usage 的彙總數字，與 AI 頁的預測比對 ai.predictions；
+     這個檔載入失敗只影響那三處，頁首提示，其他頁照常。
+     ★ 目前三處都隱藏：SNQ 與平台使用率 SHOW_PLATFORM=false（使用者 2026-11-11 指示）、AI 頁 SHOW_AI=false（2026-11-09）。
+       兩個都是 false 就不讀這個檔，頁首也不顯示它的提示與範例標籤；renderSnq()／renderUsage()／renderAiScatter() 照常執行（畫成「尚無資料」）。
+       恢復時把對應的改成 true，並還原主選單與子頁籤的按鈕。
    ・normalizeCase() 把兩種通報轉成同一種案件物件，各頁 render*() 只讀案件物件。
      data.json 改欄位名或代碼時，只改 normalizeCase() 與下面的代碼表。
    ・日期篩選一律以通報時間（timePoint.reportedAt）的臺北日期為準，含頭尾；結案率不受日期篩選影響。
      平台起始日固定 2026/10/05（PLATFORM_START）：日期最早可選這天，早於這天的通報不列入。
    ・地圖模組（主腳本 geoCases()）透過 window.RD.basicCases() 取基本資料頁目前區間的案件；
-     AI 頁（目前隱藏）的 buildAiPairs()／getAiHistoryRows() 讀 RD.aiPairs()／RD.aiHistory()。
+     AI 頁（目前隱藏）的 buildAiPairs()／getAiHistoryRows() 讀 RD.aiPairs()／RD.aiHistory()（資料來自 data-platform.json，不是 data.json 的通報）。
    ・指揮儀表板「同期比較」：三年欄位保留，期間整段早於 PLATFORM_START 的年份標示「平台未啟用」（使用者 2026-11-11 決定），見 comparePeriods()。
    ========================================================================= */
 (()=>{
@@ -22952,8 +22954,13 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
 
   const DATA_FILE='data.json';
   const PLATFORM_FILE='data-platform.json';
-  /* 醫院內控指標、平台使用率先隱藏（2026-11-11）：false＝不讀 data-platform.json（檔案不存在也不會有 404 或頁首提示） */
+  /* data-platform.json 的三個使用處目前都隱藏：醫院內控指標與平台使用率（2026-11-11）、AI模型預測準確率（2026-11-09）。
+     兩個都是 false＝不讀 data-platform.json（檔案不存在也不會有 404 或頁首提示）；任一個 true 就讀 */
   const SHOW_PLATFORM=false;
+  const SHOW_AI=false;
+  const LOAD_PLATFORM=SHOW_PLATFORM || SHOW_AI;
+  /* 頁首「平台資料未載入」提示裡列出受影響的頁面 */
+  const PLATFORM_PAGES=[...(SHOW_PLATFORM ? ['醫院內控指標','平台使用率'] : []),...(SHOW_AI ? ['AI模型預測準確率'] : [])].join('、');
   /* 2＝緊急醫療＋優化計畫；1＝prod 的舊格式（只有 emg），讀得懂，方便拿正式資料對照 */
   const SCHEMA_VERSIONS=[1,2];
   const PLATFORM_SCHEMA_VERSION=1;
@@ -22996,17 +23003,17 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
     updatedAt:null, updatedTime:null, updatedHasTime:false, asOf:null, dataStart:null, sample:false, stats:null,
     ranges:{}, types:{},
     basicCases(){ const r=RD.ranges.basic; return r ? casesIn(r.start,r.end) : []; },
-    /* AI 頁：預測與實測分數都有的個案（系統內全部，不受篩選） */
-    aiPairs(){ return aiCases().map((c,i)=>({ predicted:c.ai.predicted, measured:c.ai.actual, index:i+1 })); },
-    /* AI 頁：依模型版本（版本第一次出現的通報日排序）累積的比對筆數與相關係數 */
+    /* AI 頁：data-platform.json 的 ai.predictions 中預測與實測分數都有的筆數（全部，不受篩選） */
+    aiPairs(){ return aiRows().map((a,i)=>({ predicted:a.predicted, measured:a.actual, index:i+1 })); },
+    /* AI 頁：依模型版本（版本第一次出現的預測日期排序，沒有日期的排最後）累積的比對筆數與相關係數 */
     aiHistory(){
-      const list=aiCases().filter(c=>c.ai.version);
+      const list=aiRows().filter(a=>a.version);
       const first=new Map();
-      list.forEach(c=>{ const d=first.get(c.ai.version); if(!d || c.day<d) first.set(c.ai.version,c.day); });
-      const versions=[...first].sort((a,b)=>a[1].localeCompare(b[1]) || a[0].localeCompare(b[0],undefined,{ numeric:true }));
+      list.forEach(a=>{ const d=first.get(a.version); if(!first.has(a.version) || (a.day && (!d || a.day<d))) first.set(a.version,a.day); });
+      const versions=[...first].sort((a,b)=>(a[1] || '9999').localeCompare(b[1] || '9999') || a[0].localeCompare(b[0],undefined,{ numeric:true }));
       const out=[], acc=[];
       versions.forEach(([version,day])=>{
-        list.filter(c=>c.ai.version===version).forEach(c=>acc.push({ predicted:c.ai.predicted, measured:c.ai.actual }));
+        list.filter(a=>a.version===version).forEach(a=>acc.push({ predicted:a.predicted, measured:a.actual }));
         const r=pearson(acc);
         if(acc.length>=3 && r!=null) out.push({ date:slashDate(day), version:/^v/i.test(version) ? version : `v${version}`, population:acc.length, correlation:r });
       });
@@ -23047,7 +23054,7 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
     rows.forEach(r=>{ const a=r.predicted-mx, b=r.measured-my; num+=a*b; dx+=a*a; dy+=b*b; });
     return dx>0 && dy>0 ? num/Math.sqrt(dx*dy) : null;
   }
-  const aiCases=()=>RD.cases.filter(c=>c.ai && c.ai.predicted!=null && c.ai.actual!=null);
+  const aiRows=()=>RD.platform?.ai || [];
 
   /* 時間字串 → 毫秒。沒有時區的字串（含只有日期）一律視為臺北時間 */
   function parseTime(v){
@@ -23120,7 +23127,7 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
   async function loadFromServer(){
     const [dataText,platform]=await Promise.all([
       fetchText(DATA_FILE),
-      SHOW_PLATFORM
+      LOAD_PLATFORM
         ? fetchText(PLATFORM_FILE).then(t=>({ obj:parseJsonLoose(t,PLATFORM_FILE) }),err=>({ error:err.message || String(err) }))
         : {}
     ]);
@@ -23134,12 +23141,12 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
     for(const f of files){
       const obj=parseJsonLoose(await f.text(),f.name);
       if(obj && (Array.isArray(obj.emg) || Array.isArray(obj.opt))) raw=obj;
-      else if(obj && (obj.snq || obj.usage)) platform=obj;
+      else if(obj && (obj.snq || obj.usage || obj.ai)) platform=obj;
       else throw new Error(`看不出 ${f.name} 是 data.json 還是 data-platform.json`);
     }
-    if(!raw) throw new Error(SHOW_PLATFORM ? '請選取 data.json（可以同時選 data-platform.json）' : '請選取 data.json');
-    /* SHOW_PLATFORM=false：選了 data-platform.json 也不用 */
-    if(!SHOW_PLATFORM) return { raw, platform:null, platformError:null };
+    if(!raw) throw new Error(LOAD_PLATFORM ? '請選取 data.json（可以同時選 data-platform.json）' : '請選取 data.json');
+    /* SHOW_PLATFORM、SHOW_AI 都是 false：選了 data-platform.json 也不用 */
+    if(!LOAD_PLATFORM) return { raw, platform:null, platformError:null };
     return { raw, platform, platformError:platform ? null : `未選取 ${PLATFORM_FILE}` };
   }
 
@@ -23214,8 +23221,7 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
     c.followUp={ m3:FOLLOW_STATES.includes(fu.m3) ? fu.m3 : null, m6:FOLLOW_STATES.includes(fu.m6) ? fu.m6 : null };
     const his=r.his && typeof r.his==='object' ? r.his : null;
     c.his=his ? { ipdBefore:toNum(his.ipdBefore), opdBefore:toNum(his.opdBefore), ipdAfter:toNum(his.ipdAfter), psyOpdAfter:toNum(his.psyOpdAfter), homeOpdAfter:toNum(his.homeOpdAfter) } : null;
-    const ai=r.ai && typeof r.ai==='object' ? r.ai : null;
-    c.ai=ai ? { predicted:toNum(ai.predicted), actual:toNum(ai.actual), version:ai.modelVersion==null ? null : String(ai.modelVersion) } : null;
+    /* AI 預測不在 data.json（2026-11-11 移到 data-platform.json 的 ai.predictions）；通報裡就算有 ai 也不讀 */
 
     if(kind==='emg'){
       c.intakeMethod=ACCEPT_WAY[toNum(r.acceptWay)] || null;
@@ -23301,8 +23307,16 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
         ? p.usage.units.map(u=>({ name:normText(u?.name) || '未命名單位', total:toNum(u?.total) ?? 0, loggedIn:toNum(u?.loggedIn) ?? 0 })).filter(u=>u.total>0)
         : null;
       const months=Array.isArray(p.snq?.months) ? p.snq.months.filter(m=>m && /^\d{4}-\d{2}$/.test(String(m.month))) : null;
+      /* AI 頁：一筆預測一個物件；預測或實測分數缺一的不列入。date 只用來排模型版本的先後 */
+      const ai=Array.isArray(p.ai?.predictions)
+        ? p.ai.predictions.map(a=>{
+            const t=parseTime(a?.date);
+            const version=a?.modelVersion==null || String(a.modelVersion).trim()==='' ? null : String(a.modelVersion).trim();
+            return { day:t==null ? null : dayKey(t), predicted:toNum(a?.predicted), actual:toNum(a?.actual), version };
+          }).filter(a=>a.predicted!=null && a.actual!=null)
+        : null;
       const t=parseTime(p.updatedAt);
-      RD.platform={ units, months, sample:p.sample===true };
+      RD.platform={ units, months, ai, sample:p.sample===true };
       RD.platformUpdated=t;
       RD.platformHasTime=t!=null && /\d:\d\d/.test(String(p.updatedAt));
     }catch(err){
@@ -24345,7 +24359,7 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
     if(!RD.sample && age!=null && age>STALE_AFTER_HOURS) parts.push(`<span class="rd-warn">資料已 ${Math.floor(age/24)} 天未更新</span>`);
     const emgN=count(RD.cases,c=>c.kind==='emg'), optN=RD.cases.length-emgN;
     parts.push(`<span>總案件數 <b>${fmtInt(RD.cases.length)}</b> 件（緊急醫療 ${fmtInt(emgN)}／優化計畫 ${fmtInt(optN)}，${slashDate(RD.dataStart)} 起）</span>`);
-    if(RD.platformError) parts.push(`<span class="rd-warn">平台資料（醫院內控指標、平台使用率）未載入：${esc(RD.platformError)}</span>`);
+    if(RD.platformError) parts.push(`<span class="rd-warn">平台資料（${PLATFORM_PAGES}）未載入：${esc(RD.platformError)}</span>`);
     const s=RD.stats;
     if(s.badTime) parts.push(`<span class="rd-warn">已排除：通報時間無法解析 ${s.badTime} 件</span>`);
     if(s.beforeStart) parts.push(`<span class="rd-warn">已排除：通報日早於平台起始日 ${slashDate(PLATFORM_START)} 的 ${s.beforeStart} 件</span>`);
@@ -24369,7 +24383,7 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
     const why=err ? `資料載入失敗：${esc(err.message || err)}。` : '以 file:// 直接開檔時，瀏覽器不允許網頁自動讀取同資料夾的 data.json。';
     el.classList.add('rd-error');
     el.innerHTML=`<span>${why}</span>`
-      +`<label class="rd-pick">選擇 data.json${SHOW_PLATFORM ? '（可一併選 data-platform.json）' : ''}<input type="file" multiple accept=".json,.jsonc,application/json"></label>`
+      +`<label class="rd-pick">選擇 data.json${LOAD_PLATFORM ? '（可一併選 data-platform.json）' : ''}<input type="file" multiple accept=".json,.jsonc,application/json"></label>`
       +(local ? '<span>或改用本機伺服器開啟（例如 VS Code Live Server）。</span>' : '');
     el.querySelector('input').addEventListener('change',e=>{
       if(e.target.files.length) loadFromPicker(e.target.files).then(start).catch(showError);
