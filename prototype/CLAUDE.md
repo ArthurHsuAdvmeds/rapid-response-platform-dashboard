@@ -14,7 +14,7 @@
 | `v1/`–`v9/` | 各版原型，全部並存、可個別開啟；**最新是 `v9/`** |
 | `release-note/` | V2 以後每版相對前一版的差異與點選路徑（給客戶會議對照） |
 
-正式版 `../prod/` 以 v7 為基礎改接真實資料，跟這裡的版號分開走。
+正式版 `../prod/` 2026-11-11 起是 v9 改接真實資料（由 `../qa/` 同步），跟這裡的版號分開走。
 
 ---
 
@@ -103,7 +103,7 @@
   v73 的 `updateHospital()` 還會藏 `#hospitalUnableCard`、替 `#hospitalSplitLayout` 加 `hospital-single-column`，與 v9 不衝突；不要再給新卡片 `data-hospital-kind`，v73 只會處理第一張。
 - 成效頁「後續醫療資源使用狀況」與本頁有同一組指標（兩頁都留著，是否移除待客戶確認）；`kpi.csv` 154–159 是 v9 新增，89、90、94 標「【V9 移除】」。
 
-**還沒帶進 v8／v9 的修正**（prod 的 `<style id="real-data">` 有）：效率頁處理流程的「小時」和數字重疊（`.eff-v79-flow-seg`）；≥900px 通報者頁長條數值壓到上緣（`.reporter-bar-chart` 上方留白）。
+**還沒帶進 v8／v9 原型的修正**（qa、prod 的 `<style id="qa-data">` 有）：效率頁處理流程的「小時」和數字重疊（`.eff-v79-flow-seg`）；≥900px 通報者頁長條數值壓到上緣（`.reporter-bar-chart` 上方留白）。
 
 ---
 

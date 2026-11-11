@@ -14,7 +14,7 @@ qa 版儀表板（本 repo 的 `qa/`）要拿到什麼資料、放在哪裡、�
 - **AI 預測放在 `data-platform.json`，不在 `data.json`**（使用者 2026-11-11 指示）。
 - **qa 目前隱藏醫院內控指標、平台使用率（2026-11-11）與 AI模型預測準確率（2026-11-09），不讀 `data-platform.json`**：平台專案可以先只產生 `data.json`，`data-platform.json` 的格式（第 4 節）保留，恢復時照用。
 - **每個欄位的意義、型別、代碼都寫在兩個範本的註解裡，以範本為準**；這份只寫規則、代碼表、欄位與指標的對應、待確認事項。
-- 目前 `qa/` 裡的兩個檔是虛構的範例資料（最外層 `"sample": true`，頁首顯示「範例資料（虛構）」），平台專案產生正式檔後直接覆蓋。
+- `qa/data.json` 2026-11-11 起是平台的正式資料；`qa/data-platform.json` 還是虛構的範例資料（最外層 `"sample": true`，頁首顯示「範例資料（虛構）」），平台專案產生正式檔後直接覆蓋。
 - 標 ★ 的是還沒確認的地方，問題集中在第 6 節。
 
 ---
@@ -151,8 +151,8 @@ HIS 的身分證比對在平台專案做完，檔案裡只放比對後的次數�
 
 ## 8. 版本與上線順序
 
-- **qa 驗證期間**：prod 照舊讀 `prod/data.json`（schemaVersion 1，只有 emg）。平台專案產生 v2 後，把 `emg` 的 v1 欄位挑出來、`schemaVersion` 寫 1，就是 prod 要的檔。
-- **qa 通過後**：qa 的版面與資料層換到 prod，prod 改讀 v2 的兩個檔；這份規格取代 prod 版。
+- **2026-11-11 qa 通過**：qa 的版面與資料層換到 prod，prod 改讀 v2 的 `data.json`（不用 `data-platform.json`），[prod/DATA_CONTRACT.md](../prod/DATA_CONTRACT.md) 改寫成這份的 prod 版。
+- 之後 qa 用來驗證下一版：格式有變時先改這份，驗證通過再同步到 prod 的規格。
 - 之後改格式：新增選填欄位不用改版號；改名、刪欄位、改代碼意義 → `schemaVersion` 加 1，先讓儀表板同時支援新舊版本並上線，平台再切換。每次都先改範本與這份文件。
 - v2 還沒有正式產出過，所以 V9 追加（2026-11-09）直接改在 v2、不加版號：`bureau.result` 的 `2` 改為轉介松德院區、`closing.referrals` 改放代碼、拿掉 `dataStart` 與 `options.referral`。
 - 同樣的理由，2026-11-11 把 AI 預測從 `data.json` 每筆通報的 `ai` 移到 `data-platform.json` 的 `ai.predictions`，兩個檔都不加版號。

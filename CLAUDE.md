@@ -19,8 +19,8 @@
 | 路徑 | 內容 | 進版控 | 文件 |
 | --- | --- | --- | --- |
 | `index.html` | 轉址到 `prod/` | ✓ | — |
-| `prod/` | 正式版：`index.html`（以原型 v7 為基礎，只保留緊急醫療，數字由資料即時計算）＋ `data.json`（排程主機定期 push） | ✓ | [prod/CLAUDE.md](prod/CLAUDE.md)、[prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md) |
-| `qa/` | 驗證版：`index.html`（原型 v9 全部頁面接資料，AI 頁、醫院內控指標、指揮儀表板的平台使用率先隱藏，平台起始日固定 2026/10/05，同期比較中起始日以前的年份標示未啟用）＋ `data.json`（schemaVersion 2）＋ `data-platform.json`（SNQ、平台使用率、AI 預測；三處隱藏期間不讀）；目前兩個資料檔是虛構範例；另有兩個資料範本 `*.template.jsonc` | ✓ | [qa/CLAUDE.md](qa/CLAUDE.md)、[qa/DATA_CONTRACT.md](qa/DATA_CONTRACT.md) |
+| `prod/` | 正式版：`index.html`（2026-11-11 由 qa 同步，原型 v9 全部頁面接資料；AI 頁、醫院內控指標、平台使用率隱藏中）＋ `data.json`（schemaVersion 2，平台專案定期 push）＋ `data.template.jsonc`；不用 `data-platform.json` | ✓ | [prod/CLAUDE.md](prod/CLAUDE.md)、[prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md) |
+| `qa/` | 驗證版：`index.html`（原型 v9 全部頁面接資料，AI 頁、醫院內控指標、指揮儀表板的平台使用率先隱藏，平台起始日固定 2026/10/05，同期比較中起始日以前的年份標示未啟用）＋ `data.json`（schemaVersion 2）＋ `data-platform.json`（SNQ、平台使用率、AI 預測；三處隱藏期間不讀）；`data.json` 2026-11-11 起是平台的正式資料，`data-platform.json` 還是虛構範例；另有兩個資料範本 `*.template.jsonc` | ✓ | [qa/CLAUDE.md](qa/CLAUDE.md)、[qa/DATA_CONTRACT.md](qa/DATA_CONTRACT.md) |
 | `prototype/` | `v1/`–`v9/` 原型（最新 `v9/`）、`release-note/`、轉址頁 `index.html` | ✓ | [prototype/CLAUDE.md](prototype/CLAUDE.md) |
 | `V9調整.md` | 客戶對 v9「醫療機構端處理成效分析」的調整清單（v9 的需求來源） | 使用者決定 | — |
 | `.tool/` | 本機工具：`qa_sample_data.py` 產生 qa 的虛構範例資料；也放驗證腳本與截圖 | ✗（`.gitignore`） | — |
@@ -33,11 +33,11 @@
 
 ## 2. 資料與排程（誰動哪些檔）
 
-- `prod/data.json` 屬於排程主機上的另一個專案：它定期從平台撈全部緊急醫療通報，**整份覆寫**這個檔後 push 到 `main`。
+- `prod/data.json` 屬於排程主機上的另一個專案（平台專案）：它定期從平台撈全部緊急醫療與優化計畫通報（schemaVersion 2），**整份覆寫**這個檔後 push 到 `main`。
   排程要拿到什麼、怎麼放，全部寫在 [prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md)；本 repo 不記排程的實作。
-- `qa/data.json`、`qa/data-platform.json` 之後也由平台專案產生（新格式 schemaVersion 2，見 [qa/DATA_CONTRACT.md](qa/DATA_CONTRACT.md)）；在那之前是 `.tool/qa_sample_data.py` 產生的虛構範例。
-  qa 驗證期間 prod 照舊讀 v1 的 `prod/data.json`，驗證通過後 prod 換成 qa 的版面與格式（qa/CLAUDE.md 第 6 節）。
-- 開發時**不要手動改 `prod/data.json`、`qa/` 的兩個資料檔，也不要把測試資料 commit 進去**。測別的資料用 file:// 選檔或 Playwright 攔截（見 prod/CLAUDE.md 第 4 節、qa/CLAUDE.md 第 5 節）。
+- `qa/data.json`、`qa/data-platform.json` 用來驗證下一版（見 [qa/DATA_CONTRACT.md](qa/DATA_CONTRACT.md)）；`.tool/qa_sample_data.py` 可以重產虛構範例。
+  2026-11-11 qa 驗證通過，prod 換成 qa 的版面與格式（[prod/CLAUDE.md](prod/CLAUDE.md) 第 6 節是之後再同步的步驟）。
+- 開發時**不要手動改 `prod/data.json`、`qa/` 的兩個資料檔，也不要把測試資料 commit 進去**。測別的資料用 file:// 選檔或 Playwright 攔截（見 prod/CLAUDE.md、qa/CLAUDE.md 第 5 節）。
 - 格式要改：先改 DATA_CONTRACT.md，儀表板先支援新格式並上線，排程再切換。
 - 排程會一直推 `main`，所以**每次 push 前先 `git pull --rebase`**。
 
@@ -52,9 +52,9 @@
 
 ### 大檔與疊層（prod 與 prototype 都適用）
 
-- `prod/index.html` 約 0.77 MB、`prototype/v*/index.html` 約 0.8–2.7 MB，都是兩萬多行。**不要整份 Read**：
-  先 Grep 區段（`<style id="v…">`、`<script id="v…">`、`<script id="real-data">`、常數 `GEO_*`／`EFF_*`／`OUTCOME_*`／`BASIC_*`）再局部讀。
-  `prod/index.html` 的 `<header class="brand">`（約第 11680 行）有一行內嵌 base64 院徽的超長行，讀那附近一定要指定範圍。
+- `prod/index.html`、`qa/index.html` 約 0.93 MB、`prototype/v*/index.html` 約 0.8–2.7 MB，都是兩萬多行。**不要整份 Read**：
+  先 Grep 區段（`<style id="v…">`、`<script id="v…">`、`<script id="qa-data">`（prod 與 qa 共用這個名稱）、常數 `GEO_*`／`EFF_*`／`OUTCOME_*`／`BASIC_*`）再局部讀。
+  `prod/index.html`、`qa/index.html` 的 `<header class="brand">`（約第 12078 行）有一行內嵌 base64 院徽的超長行，讀那附近一定要指定範圍。
 - 檔案是逐版疊加的：後段的 `<style id="vNN-…">`／`<script id="vNN-…">` 覆寫前面的行為（`v41`～`v87` 是開發流水號，跟資料夾版本無關）。
   同一個選擇器常被五、六層 `!important` 覆寫，**最後一層才算數**，改之前先確認最後生效的是哪一段。
 - **CSS 權重**：舊層最高到 `(2,4,0)`＋`!important`，新規則要壓得過才有效：
@@ -66,7 +66,7 @@
   - ≥1200px：多數頁面高度鎖在視窗內（`calc(100vh - Npx)`、`overflow:hidden`），內容要縮得進去；以 125% 縮放的 **1536px** 視窗為主要驗證尺寸。
   - 900–1199px：平板，頁面依內容撐高。
   - ≤899px：手機版，主選單變黏頂下拉。
-- 各版補丁（手機 RWD、過濾器字級…）的注意事項在 [prototype/CLAUDE.md](prototype/CLAUDE.md)，prod 包含 v7 以前的所有層，一樣適用。
+- 各版補丁（手機 RWD、過濾器字級…）的注意事項在 [prototype/CLAUDE.md](prototype/CLAUDE.md)，prod、qa 包含 v9 以前的所有層，一樣適用。
 
 ---
 

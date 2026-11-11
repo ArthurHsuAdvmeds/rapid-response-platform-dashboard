@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>三軍總醫院北投分院｜精神健康個案通報管理儀表板</title>
 <meta name="robots" content="noindex, nofollow">
-<!-- prod：正式版（真實資料），版面以 prototype/v7 為基礎；數字由同資料夾的 data.json 計算，見檔尾 <script id="real-data"> 與 DATA_CONTRACT.md -->
+<!-- prod：正式版（真實資料），2026-11-11 由 qa 同步（V9 版面）。數字由同資料夾的 data.json 計算；醫院內控指標、平台使用率、AI 頁隱藏中，不讀 data-platform.json（SHOW_PLATFORM／SHOW_AI）。資料層在檔尾 <style id="qa-data">／<script id="qa-data">（沿用 qa 的名稱，方便之後再從 qa 同步），格式見 DATA_CONTRACT.md -->
 <style>
   :root{
     --blue:#40a5f3;
@@ -10868,6 +10868,406 @@
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script>
+  // ===== AI model prediction correlation =====
+  const AI_TRAINING_POPULATION = 620;
+  const AI_SCORE_MIN = 3;
+  const AI_SCORE_MAX = 15;
+  let aiCurrentCorrelation = null;
+
+  // Deterministic pseudo-random generator keeps the prototype stable across reloads.
+  function aiRand(seed){
+    let x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+    return x - Math.floor(x);
+  }
+
+  /* qa：比對資料改由 qa-data 模組提供（data-platform.json 的 ai.predictions，預測與實測分數都有的筆數）；資料還沒載入時是空陣列 */
+  function buildAiPairs(){
+    return window.RD && RD.loaded ? RD.aiPairs() : [];
+  }
+  function buildAiPairsMock(){   /* 原型的模擬資料產生器，qa 不再呼叫 */
+    const rows=[];
+    for(let i=0;i<AI_TRAINING_POPULATION;i++){
+      const r1=aiRand(i+11);
+      const r2=aiRand(i+101);
+      const r3=aiRand(i+701);
+
+      // 風險檢傷評估為 3–15 分整數，
+      // AI 預測與專業人員實測皆不產生小數分數。
+      const predicted = Math.round(
+        AI_SCORE_MIN + r1*(AI_SCORE_MAX-AI_SCORE_MIN)
+      );
+      const noise = (r2-.5)*2.0 + (r3-.5)*0.7;
+      const measured = Math.round(
+        Math.max(
+          AI_SCORE_MIN,
+          Math.min(AI_SCORE_MAX, predicted*0.94 + 0.55 + noise)
+        )
+      );
+
+      rows.push({predicted,measured,index:i+1});
+    }
+    return rows;
+  }
+
+  function pearsonCorrelation(rows){
+    const n=rows.length;
+    const mx=rows.reduce((s,r)=>s+r.predicted,0)/n;
+    const my=rows.reduce((s,r)=>s+r.measured,0)/n;
+    let num=0, dx=0, dy=0;
+
+    rows.forEach(r=>{
+      const a=r.predicted-mx;
+      const b=r.measured-my;
+      num+=a*b;
+      dx+=a*a;
+      dy+=b*b;
+    });
+
+    return num/Math.sqrt(dx*dy);
+  }
+
+  function svgEl(tag,attrs={}){
+    const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+    Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));
+    return el;
+  }
+
+  function renderAiScatter(){
+    const svg=document.getElementById('aiScatterSvg');
+    if(!svg) return;
+
+    const tooltip=document.getElementById('aiScatterTooltip');
+    if(tooltip) tooltip.hidden=true;
+
+    const data=buildAiPairs();
+    /* qa：少於 3 筆算不出有意義的相關係數與迴歸線 */
+    if(data.length<3){
+      aiCurrentCorrelation=null;
+      const corrEl=document.getElementById('aiCorrelation'), popEl=document.getElementById('aiPopulation');
+      if(corrEl) corrEl.textContent='—';
+      if(popEl) popEl.textContent=data.length.toLocaleString('zh-TW');
+      svg.innerHTML='<text x="410" y="310" text-anchor="middle" fill="#8793a4" font-size="20">尚無足夠的比對資料</text>';
+      return;
+    }
+    const r=pearsonCorrelation(data);
+    aiCurrentCorrelation=r;
+
+    const corrEl=document.getElementById('aiCorrelation');
+    const popEl=document.getElementById('aiPopulation');
+    if(corrEl) corrEl.textContent=r.toFixed(3);
+    if(popEl) popEl.textContent=data.length.toLocaleString('zh-TW');
+
+    // Simple linear regression: measured = intercept + slope * predicted.
+    const n=data.length;
+    const meanX=data.reduce((s,d)=>s+d.predicted,0)/n;
+    const meanY=data.reduce((s,d)=>s+d.measured,0)/n;
+
+    let numerator=0;
+    let denominator=0;
+    data.forEach(d=>{
+      numerator+=(d.predicted-meanX)*(d.measured-meanY);
+      denominator+=(d.predicted-meanX)*(d.predicted-meanX);
+    });
+
+    const slope=denominator ? numerator/denominator : 1;
+    const intercept=meanY-slope*meanX;
+    const regressionY=x=>Math.max(
+      AI_SCORE_MIN,
+      Math.min(AI_SCORE_MAX, intercept+slope*x)
+    );
+
+    svg.innerHTML='';
+
+    const W=820,H=620;
+    const margin={left:74,right:28,top:24,bottom:70};
+    const pw=W-margin.left-margin.right;
+    const ph=H-margin.top-margin.bottom;
+
+    const sx=v=>margin.left+((v-AI_SCORE_MIN)/(AI_SCORE_MAX-AI_SCORE_MIN))*pw;
+    const sy=v=>margin.top+ph-((v-AI_SCORE_MIN)/(AI_SCORE_MAX-AI_SCORE_MIN))*ph;
+
+    const plot=svgEl('g');
+    svg.appendChild(plot);
+
+    const ticks=[3,5,7,9,11,13,15];
+
+    ticks.forEach(t=>{
+      plot.appendChild(svgEl('line',{
+        x1:sx(t),y1:margin.top,x2:sx(t),y2:margin.top+ph,class:'ai-grid-line'
+      }));
+      plot.appendChild(svgEl('line',{
+        x1:margin.left,y1:sy(t),x2:margin.left+pw,y2:sy(t),class:'ai-grid-line'
+      }));
+
+      const xt=svgEl('text',{
+        x:sx(t),y:H-42,'text-anchor':'middle',class:'ai-axis-text'
+      });
+      xt.textContent=t;
+      plot.appendChild(xt);
+
+      const yt=svgEl('text',{
+        x:margin.left-12,y:sy(t)+4,'text-anchor':'end',class:'ai-axis-text'
+      });
+      yt.textContent=t;
+      plot.appendChild(yt);
+    });
+
+    plot.appendChild(svgEl('line',{
+      x1:margin.left,y1:margin.top+ph,
+      x2:margin.left+pw,y2:margin.top+ph,
+      class:'ai-axis-line'
+    }));
+
+    plot.appendChild(svgEl('line',{
+      x1:margin.left,y1:margin.top,
+      x2:margin.left,y2:margin.top+ph,
+      class:'ai-axis-line'
+    }));
+
+    // Ideal baseline: predicted score = measured score.
+    plot.appendChild(svgEl('line',{
+      x1:sx(AI_SCORE_MIN),y1:sy(AI_SCORE_MIN),
+      x2:sx(AI_SCORE_MAX),y2:sy(AI_SCORE_MAX),
+      class:'ai-baseline-line'
+    }));
+
+    // Regression line derived from all current training samples.
+    plot.appendChild(svgEl('line',{
+      x1:sx(AI_SCORE_MIN),y1:sy(regressionY(AI_SCORE_MIN)),
+      x2:sx(AI_SCORE_MAX),y2:sy(regressionY(AI_SCORE_MAX)),
+      class:'ai-regression-line'
+    }));
+
+    const xTitle=svgEl('text',{
+      x:margin.left+pw/2,y:H-10,'text-anchor':'middle',class:'ai-axis-title'
+    });
+    xTitle.textContent='AI模型預測分數（3–15分）';
+    svg.appendChild(xTitle);
+
+    const yTitle=svgEl('text',{
+      x:18,y:margin.top+ph/2,'text-anchor':'middle',
+      class:'ai-axis-title',
+      transform:`rotate(-90 18 ${margin.top+ph/2})`
+    });
+    yTitle.textContent='專業人員實測分數（3–15分）';
+    svg.appendChild(yTitle);
+  }
+
+
+  /* qa：依模型版本累積的比對筆數與吻合程度，由 qa-data 模組計算 */
+  function getAiHistoryRows(){
+    return window.RD && RD.loaded ? RD.aiHistory() : [];
+  }
+  function getAiHistoryRowsMock(){   /* 原型的模擬歷程，qa 不再呼叫 */
+    const current=Number.isFinite(aiCurrentCorrelation) ? aiCurrentCorrelation : 0.95;
+
+    const correlations=[
+      Math.max(0.70,current-0.120),
+      Math.max(0.72,current-0.090),
+      Math.max(0.74,current-0.060),
+      Math.max(0.76,current-0.035),
+      Math.max(0.78,current-0.015),
+      current
+    ];
+
+    return [
+      {date:'2026/02/16',version:'v0.9',population:180,correlation:correlations[0]},
+      {date:'2026/03/30',version:'v1.0',population:260,correlation:correlations[1]},
+      {date:'2026/05/12',version:'v1.1',population:340,correlation:correlations[2]},
+      {date:'2026/06/23',version:'v1.2',population:430,correlation:correlations[3]},
+      {date:'2026/08/04',version:'v1.3',population:520,correlation:correlations[4]},
+      {date:'2026/09/01',version:'v1.4',population:620,correlation:correlations[5]}
+    ];
+  }
+
+  function renderAiHistoryChart(){
+    const svg=document.getElementById('aiHistorySvg');
+    if(!svg) return;
+
+    const tooltip=document.getElementById('aiHistoryTooltip');
+    const rows=getAiHistoryRows();
+
+    svg.innerHTML='';
+    if(!rows.length){
+      svg.innerHTML='<text x="470" y="250" text-anchor="middle" fill="#8793a4" font-size="20">尚無模型版本的比對資料</text>';
+      return;
+    }
+
+    const W=940,H=500;
+    const margin={left:82,right:34,top:30,bottom:74};
+    const pw=W-margin.left-margin.right;
+    const ph=H-margin.top-margin.bottom;
+
+    const minPop=150;
+    const maxPop=650;
+    const minR=0.70;
+    const maxR=1.00;
+
+    const sx=v=>margin.left+((v-minPop)/(maxPop-minPop))*pw;
+    const sy=v=>margin.top+ph-((v-minR)/(maxR-minR))*ph;
+
+    const popTicks=[200,300,400,500,600];
+    const rTicks=[0.70,0.75,0.80,0.85,0.90,0.95,1.00];
+
+    rTicks.forEach(t=>{
+      svg.appendChild(svgEl('line',{
+        x1:margin.left,y1:sy(t),
+        x2:margin.left+pw,y2:sy(t),
+        class:'ai-history-grid'
+      }));
+
+      const label=svgEl('text',{
+        x:margin.left-12,y:sy(t)+4,
+        'text-anchor':'end',
+        class:'ai-history-axis-text'
+      });
+      label.textContent=t.toFixed(2);
+      svg.appendChild(label);
+    });
+
+    popTicks.forEach(t=>{
+      svg.appendChild(svgEl('line',{
+        x1:sx(t),y1:margin.top,
+        x2:sx(t),y2:margin.top+ph,
+        class:'ai-history-grid vertical'
+      }));
+
+      const label=svgEl('text',{
+        x:sx(t),y:H-43,
+        'text-anchor':'middle',
+        class:'ai-history-axis-text'
+      });
+      label.textContent=t;
+      svg.appendChild(label);
+    });
+
+    svg.appendChild(svgEl('line',{
+      x1:margin.left,y1:margin.top+ph,
+      x2:margin.left+pw,y2:margin.top+ph,
+      class:'ai-history-axis'
+    }));
+
+    svg.appendChild(svgEl('line',{
+      x1:margin.left,y1:margin.top,
+      x2:margin.left,y2:margin.top+ph,
+      class:'ai-history-axis'
+    }));
+
+    const pathD=rows.map((row,index)=>
+      `${index===0?'M':'L'} ${sx(row.population)} ${sy(row.correlation)}`
+    ).join(' ');
+
+    svg.appendChild(svgEl('path',{
+      d:pathD,
+      class:'ai-history-line'
+    }));
+
+    rows.forEach(row=>{
+      const g=svgEl('g',{class:'ai-history-point-group'});
+      const point=svgEl('circle',{
+        cx:sx(row.population),
+        cy:sy(row.correlation),
+        r:6,
+        class:'ai-history-point'
+      });
+
+      const value=svgEl('text',{
+        x:sx(row.population),
+        y:sy(row.correlation)-14,
+        'text-anchor':'middle',
+        class:'ai-history-value'
+      });
+      value.textContent=row.correlation.toFixed(3);
+
+      const showTooltip=e=>{
+        if(!tooltip) return;
+        const box=svg.getBoundingClientRect();
+
+        tooltip.hidden=false;
+        tooltip.innerHTML=
+          `<b>${row.version}</b><br>`+
+          `日期：${row.date}<br>`+
+          `累積比對資料：${row.population.toLocaleString('zh-TW')} 筆<br>`+
+          `吻合程度：${row.correlation.toFixed(3)}`;
+
+        let x=e.clientX-box.left+14;
+        let y=e.clientY-box.top+14;
+
+        if(x+190>box.width) x-=204;
+        if(y+105>box.height) y-=116;
+
+        tooltip.style.left=`${Math.max(6,x)}px`;
+        tooltip.style.top=`${Math.max(6,y)}px`;
+      };
+
+      point.addEventListener('mousemove',showTooltip);
+      point.addEventListener('mouseenter',showTooltip);
+      point.addEventListener('mouseleave',()=>{
+        if(tooltip) tooltip.hidden=true;
+      });
+
+      g.appendChild(point);
+      g.appendChild(value);
+      svg.appendChild(g);
+    });
+
+    const xTitle=svgEl('text',{
+      x:margin.left+pw/2,y:H-10,
+      'text-anchor':'middle',
+      class:'ai-history-axis-title'
+    });
+    xTitle.textContent='累積比對資料';
+    svg.appendChild(xTitle);
+
+    const yTitle=svgEl('text',{
+      x:20,y:margin.top+ph/2,
+      'text-anchor':'middle',
+      class:'ai-history-axis-title',
+      transform:`rotate(-90 20 ${margin.top+ph/2})`
+    });
+    yTitle.textContent='吻合程度';
+    svg.appendChild(yTitle);
+  }
+
+  function initAiCorrelationDialog(){
+    const dialog=document.getElementById('aiCorrelationDialog');
+    const openBtn=document.getElementById('openAiCorrelationDialog');
+    const closeBtn=document.getElementById('closeAiCorrelationDialog');
+
+    if(!dialog || !openBtn) return;
+
+    openBtn.addEventListener('click',()=>{
+      renderAiHistoryChart();
+
+      if(typeof dialog.showModal==='function'){
+        dialog.showModal();
+      }else{
+        dialog.setAttribute('open','');
+      }
+    });
+
+    if(closeBtn){
+      closeBtn.addEventListener('click',()=>{
+        if(typeof dialog.close==='function') dialog.close();
+        else dialog.removeAttribute('open');
+      });
+    }
+
+    dialog.addEventListener('click',e=>{
+      if(e.target===dialog){
+        if(typeof dialog.close==='function') dialog.close();
+        else dialog.removeAttribute('open');
+      }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded',()=>{
+    renderAiScatter();
+    initAiCorrelationDialog();
+  });
+
+</script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
 
 <style>
@@ -11683,14 +12083,22 @@
     </div>
   </header>
 
-  <!-- real-data：資料載入狀態、資料更新日、總案件數、範例資料提示（由檔尾 real-data 模組填入） -->
+  <!-- qa-data：資料載入狀態、資料更新時間、總案件數、範例資料提示（由檔尾 qa-data 模組填入） -->
   <div class="rd-status" id="rdStatus" role="status" aria-live="polite">資料載入中…</div>
 
   <nav class="tabs">
     <button class="tab active" data-page="basic">基本資料</button>
     <button class="tab" data-page="risk">通報案件風險分析</button>
     <button class="tab" data-page="efficiency">案件處理效率指標</button>
+    <button class="tab" data-page="outcome">精神症狀改善成效指標</button>
+    <!-- qa：AI模型預測準確率先隱藏（使用者 2026-11-09 指示；比對資料在 data-platform.json 的 ai）；
+         要恢復就把下一行還原成按鈕、拿掉 #ai 的 hidden，並把 qa-data 的 SHOW_AI 改成 true -->
+    <!-- <button class="tab" data-page="ai">AI模型預測準確率</button> -->
     <button class="tab" data-page="reporter">通報者基本資料分析</button>
+    <button class="tab" data-page="hospital">醫療機構端處理成效分析</button>
+    <!-- qa：醫院內控指標先隱藏（使用者 2026-11-11 指示，與平台使用率一起，兩者與 AI 頁都讀 data-platform.json）；
+         要恢復就把下一行還原成按鈕、拿掉 #snq 的 hidden，並把 qa-data 的 SHOW_PLATFORM 改成 true -->
+    <!-- <button class="tab" data-page="snq">醫院內控指標(SNQ)</button> -->
     <button class="tab" data-page="command">指揮儀表板</button>
   </nav>
 
@@ -11853,7 +12261,9 @@
     <div class="analysis-filter-row">
       <div class="analysis-filter-label">通報類別分析</div>
       <div class="risk-filter" id="riskFilter">
-        <button type="button" class="risk-filter-btn active" data-filter="emergency">緊急醫療</button>
+        <button type="button" class="risk-filter-btn active" data-filter="all">全部</button>
+        <button type="button" class="risk-filter-btn" data-filter="emergency">緊急醫療</button>
+        <button type="button" class="risk-filter-btn" data-filter="optimized">優化計畫</button>
       </div>
     </div>
 
@@ -11918,6 +12328,8 @@
       <div class="eff-v79-tabs" id="effV79Tabs" role="tablist" aria-label="案件處理效率檢視">
         <button class="eff-v79-tab active" data-eff-view="overview" role="tab" aria-selected="true">總覽</button>
         <button class="eff-v79-tab" data-eff-view="emergency" role="tab">緊急醫療處置效率</button>
+        <button class="eff-v79-tab" data-eff-view="hospital" role="tab">優化計畫醫院端處置效率</button>
+        <button class="eff-v79-tab" data-eff-view="bureau" role="tab">優化計畫衛生局處置效率</button>
       </div>
       <span class="efficiency-range-label" id="efficiencyRangeLabel">2026/01/01－2026/09/25</span>
     </div>
@@ -11939,14 +12351,14 @@
 
     <!-- ===== Tab 1：總覽 ===== -->
     <div class="eff-v79-panel active" data-eff-panel="overview">
-      <div class="eff-v79-section-heading"><div><span>總覽</span><h3>不同風險個案處理時間（平均）</h3></div><small>緊醫完成受理 － 個案通報時間</small></div>
+      <div class="eff-v79-section-heading"><div><span>總覽</span><h3>不同風險個案處理時間（平均）</h3></div><small>緊醫完成受理／優化計畫完成首次訪視 － 個案通報時間</small></div>
 
       <article class="eff-v79-card eff-v79-risk-compare">
-        <div class="eff-v79-risk-row high"><div class="eff-v79-risk-name"><span>高風險</span><small data-eff-n="riskHigh">N = —</small></div><div class="eff-v79-risk-bar"><i data-eff-bar="riskHigh" style="width:0%"></i></div><strong data-eff-value="riskHigh">—</strong><em>小時</em><button class="eff-v79-info" data-metric="高風險個案處理時間(平均)">i</button></div>
-        <div class="eff-v79-risk-row medium"><div class="eff-v79-risk-name"><span>中風險</span><small data-eff-n="riskMedium">N = —</small></div><div class="eff-v79-risk-bar"><i data-eff-bar="riskMedium" style="width:0%"></i></div><strong data-eff-value="riskMedium">—</strong><em>小時</em><button class="eff-v79-info" data-metric="中風險個案處理時間(平均)">i</button></div>
-        <div class="eff-v79-risk-row low"><div class="eff-v79-risk-name"><span>低風險</span><small data-eff-n="riskLow">N = —</small></div><div class="eff-v79-risk-bar"><i data-eff-bar="riskLow" style="width:0%"></i></div><strong data-eff-value="riskLow">—</strong><em>小時</em><button class="eff-v79-info" data-metric="低風險個案處理時間(平均)">i</button></div>
+        <div class="eff-v79-risk-row high"><div class="eff-v79-risk-name"><span>高風險</span><small data-eff-n="riskHigh">N = —</small></div><div class="eff-v79-risk-bar"><i data-eff-bar="riskHigh" style="width:0%"></i></div><strong data-eff-value="riskHigh">1.6</strong><em>天</em><button class="eff-v79-info" data-metric="高風險個案處理時間(平均)">i</button></div>
+        <div class="eff-v79-risk-row medium"><div class="eff-v79-risk-name"><span>中風險</span><small data-eff-n="riskMedium">N = —</small></div><div class="eff-v79-risk-bar"><i data-eff-bar="riskMedium" style="width:0%"></i></div><strong data-eff-value="riskMedium">3.4</strong><em>天</em><button class="eff-v79-info" data-metric="中風險個案處理時間(平均)">i</button></div>
+        <div class="eff-v79-risk-row low"><div class="eff-v79-risk-name"><span>低風險</span><small data-eff-n="riskLow">N = —</small></div><div class="eff-v79-risk-bar"><i data-eff-bar="riskLow" style="width:0%"></i></div><strong data-eff-value="riskLow">5.8</strong><em>天</em><button class="eff-v79-info" data-metric="低風險個案處理時間(平均)">i</button></div>
       </article>
-      <div class="eff-v79-risk-note">條形長度用來比較相對處理時間；實際值以右側平均小時數為準。</div>
+      <div class="eff-v79-risk-note">條形長度用來比較相對處理時間；實際值以右側平均天數為準。</div>
 
       <div class="eff-v86-jump-head">各處置面向重點<small>點擊卡片可切換至該頁籤查看完整指標</small></div>
       <div class="eff-v86-jump-grid">
@@ -11955,6 +12367,20 @@
           <div class="eff-v86-jump-metrics">
             <div><b data-eff-value="emergencyClose">88.4</b><em>%</em><small>緊醫案件結案率</small></div>
             <div><b data-eff-value="emergencyTotal">2.5</b><em>小時</em><small>出勤總反應時間</small></div>
+          </div>
+        </button>
+        <button type="button" class="eff-v86-jump hospital" data-eff-jump="hospital">
+          <span class="eff-v86-jump-title">優化計畫醫院端處置效率<i>→</i></span>
+          <div class="eff-v86-jump-metrics">
+            <div><b data-eff-value="hospitalOpen">82.6</b><em>%</em><small>轉介案件開案率</small></div>
+            <div><b data-eff-value="replyBureau">1.5</b><em>天</em><small>回覆衛生局時間</small></div>
+          </div>
+        </button>
+        <button type="button" class="eff-v86-jump bureau" data-eff-jump="bureau">
+          <span class="eff-v86-jump-title">優化計畫衛生局處置效率<i>→</i></span>
+          <div class="eff-v86-jump-metrics">
+            <div><b data-eff-value="bureauToHospital">41.6</b><em>%</em><small>衛生局轉介本院率</small></div>
+            <div><b data-eff-value="bureauReply">1.1</b><em>天</em><small>衛生局回覆通報時間</small></div>
           </div>
         </button>
       </div>
@@ -12014,12 +12440,414 @@
       </div>
     </div>
 
+    <!-- ===== Tab 3：優化計畫衛生局處置效率 ===== -->
+    <div class="eff-v79-panel" data-eff-panel="bureau" hidden>
+      <div class="eff-v79-section-heading"><div><span>優化計畫衛生局處置效率</span><h3>衛生局回覆與轉介</h3></div><small>通報轉介單 → 衛生局回覆單 → 轉介北投／轉介松德院區／暫不轉介</small></div>
+
+      <article class="eff-v83-routing-card">
+        <div class="eff-v83-routing-head">
+          <div><span>衛生局回覆單分流結果</span><small>以下比例皆以已完成衛生局回覆單案件為基礎</small></div>
+          <strong><span data-eff-count="replied">—</span> <em>件已完成回覆</em></strong>
+        </div>
+        <div class="eff-v83-routing-flow">
+          <div class="eff-v83-flow-step source"><b>通報人</b><span>完成優化計畫轉介單</span></div>
+          <i class="eff-v83-flow-arrow">→</i>
+          <div class="eff-v83-flow-step bureau"><b>衛生局</b><span>完成衛生局回覆單</span></div>
+          <i class="eff-v83-flow-arrow">→</i>
+          <div class="eff-v83-routing-results">
+            <div class="beitou"><span>轉介三總北投</span><strong data-eff-value="bureauToHospital">41.6</strong><em>%</em><small data-eff-count="tsgh">— 件</small></div>
+            <div class="other"><span>轉介松德院區</span><strong data-eff-computed="songdeReferral">16.6</strong><em>%</em><small data-eff-count="songde">— 件</small></div>
+            <div class="hold"><span>暫不轉介</span><strong data-eff-value="nonReferralRate">41.8</strong><em>%</em><small data-eff-count="hold">— 件</small></div>
+          </div>
+        </div>
+      </article>
+
+      <div class="eff-v83-bureau-rate-grid eff-v86-bureau-rate-4">
+        <article><span>衛生局醫療轉介率</span><strong data-eff-value="bureauReferral">58.2</strong><em>%</em><small>轉介醫療機構 ÷ 已完成回覆單</small><button class="eff-v79-info" data-metric="衛生局醫療轉介率">i</button></article>
+        <article><span>衛生局轉介本院率</span><strong data-eff-value="bureauToHospital">41.6</strong><em>%</em><small>轉介北投 ÷ 已完成回覆單</small><button class="eff-v79-info" data-metric="衛生局轉介本院率">i</button></article>
+        <article><span>本院醫療轉介占率</span><strong data-eff-value="hospitalShare">71.5</strong><em>%</em><small>轉介北投 ÷ 衛生局轉介醫療機構案件數</small><button class="eff-v79-info" data-metric="本院醫療轉介占率">i</button></article>
+        <article><span>衛生局暫不轉介率</span><strong data-eff-value="nonReferralRate">41.8</strong><em>%</em><small>暫不轉介 ÷ 已完成回覆單</small><button class="eff-v79-info" data-metric="衛生局暫不轉介率">i</button></article>
+      </div>
+
+      <div class="eff-v83-bureau-bottom">
+        <article class="eff-v79-card eff-v83-reason-table-card">
+          <div class="eff-v79-card-title"><div><h4>暫不轉介原因分布</h4><span>依人數由多到少排列</span></div><button class="eff-v79-info text" data-metric="暫不轉介原因分布">指標定義</button></div>
+          <div class="eff-v83-reason-table-wrap">
+            <table class="eff-v83-reason-table">
+              <thead><tr><th>暫不轉介原因</th><th>人數</th><th>百分比</th></tr></thead>
+              <tbody id="effBureauReasonBody"></tbody>
+            </table>
+          </div>
+          <div class="eff-v83-table-foot">百分比＝各原因案件數 ÷ 衛生局暫不轉介案件數</div>
+        </article>
+
+        <article class="eff-v79-card eff-v79-time-stack eff-v83-time-stack">
+          <div class="eff-v79-card-title"><h4>衛生局處理時間</h4><span>平均</span></div>
+          <div class="eff-v79-time-row"><div><b>訪視時間</b><small>網絡完成通報 → 衛生局出勤訪視</small></div><strong data-eff-value="bureauVisit">1.8</strong><em>天</em><button class="eff-v79-info" data-metric="衛生局訪視時間">i</button></div>
+          <div class="eff-v79-time-row"><div><b>分流決策時間</b><small>網絡完成通報 → 衛生局決定是否派案</small></div><strong data-eff-value="bureauDecision">0.9</strong><em>天</em><button class="eff-v79-info" data-metric="衛生局分流決策時間">i</button></div>
+          <div class="eff-v79-time-row"><div><b>回覆通報時間</b><small>網絡完成通報 → 衛生局完成回覆單</small></div><strong data-eff-value="bureauReply">1.1</strong><em>天</em><button class="eff-v79-info" data-metric="衛生局回覆通報時間">i</button></div>
+        </article>
+      </div>
+    </div>
+
+    <!-- ===== Tab 4：優化計畫醫院端處置效率 ===== -->
+    <div class="eff-v79-panel" data-eff-panel="hospital" hidden>
+      <div class="eff-v79-section-heading"><div><span>優化計畫醫院端處置效率</span><h3>開案、覆核與醫療介入</h3></div><small>從衛生局回覆到本院完成專業處置</small></div>
+      <div class="eff-v79-rate-strip hospital">
+        <article><span>轉介案件開案率</span><strong data-eff-value="hospitalOpen">82.6</strong><em>%</em><button class="eff-v79-info" data-metric="衛生局轉介案件開案率">i</button></article>
+        <article><span>暫不轉介覆核同意率</span><strong data-eff-value="reviewAgree">74.1</strong><em>%</em><button class="eff-v79-info" data-metric="暫不轉介覆核同意率">i</button></article>
+        <article><span>暫不轉介覆核駁回率</span><strong data-eff-value="reviewReject">25.9</strong><em>%</em><button class="eff-v79-info" data-metric="暫不轉介覆核駁回率">i</button></article>
+        <article><span>暫不轉介案件醫療介入率</span><strong data-eff-value="nonReferralIntervention">18.7</strong><em>%</em><button class="eff-v79-info" data-metric="暫不轉介案件醫療介入率">i</button></article>
+      </div>
+      <article class="eff-v79-card eff-v79-process-matrix">
+        <div class="eff-v79-card-title"><h4>本院處理時效</h4><span>平均時間</span></div>
+        <div class="eff-v79-process-grid">
+          <div class="eff-v79-process-item"><span>暫不轉介案件覆核時間</span><strong data-eff-value="reviewTime">0.6</strong><em>天</em><button class="eff-v79-info" data-metric="暫不轉介案件覆核時間">i</button></div>
+          <div class="eff-v79-process-item"><span>轉介案件派案時間</span><strong data-eff-value="referralAssign">0.3</strong><em>小時</em><button class="eff-v79-info" data-metric="轉介案件派案時間">i</button></div>
+          <div class="eff-v79-process-item"><span>轉介案件首次聯繫時間</span><strong data-eff-value="referralContact">4.2</strong><em>小時</em><button class="eff-v79-info" data-metric="轉介案件首次聯繫時間">i</button></div>
+          <div class="eff-v79-process-item"><span>派案後首次聯繫時間</span><strong data-eff-value="afterAssignContact">3.1</strong><em>小時</em><button class="eff-v79-info" data-metric="派案後首次聯繫時間">i</button></div>
+          <div class="eff-v79-process-item"><span>首次專業評估時間</span><strong data-eff-value="firstProfessional">1.2</strong><em>天</em><button class="eff-v79-info" data-metric="首次專業評估時間">i</button></div>
+          <div class="eff-v79-process-item"><span>回覆衛生局時間</span><strong data-eff-value="replyBureau">1.5</strong><em>天</em><button class="eff-v79-info" data-metric="回覆衛生局時間">i</button></div>
+        </div>
+      </article>
+    </div>
   </section>
 
   <dialog class="eff-v79-dialog" id="effV79MetricDialog">
     <div class="eff-v79-dialog-shell">
       <div class="eff-v79-dialog-head"><div><span>指標說明</span><h3 id="effV79DialogTitle">指標名稱</h3></div><button type="button" id="effV79DialogClose" aria-label="關閉">×</button></div>
       <div class="eff-v79-dialog-body"><p id="effV79DialogDefinition"></p></div>
+    </div>
+  </dialog>
+
+
+  <!-- 4 -->
+  <section class="page" id="outcome">
+    <div class="outcome-v62-toolbar">
+      <div class="outcome-v62-tabs" id="outcomeViewTabs" role="tablist" aria-label="精神症狀改善成效指標檢視">
+        <button type="button" class="outcome-v62-tab active" data-outcome-tab="improvement" role="tab" aria-selected="true">改善情況</button>
+        <button type="button" class="outcome-v62-tab" data-outcome-tab="followup" role="tab" aria-selected="false">評估表填寫狀況</button>
+        <button type="button" class="outcome-v62-tab" data-outcome-tab="resource" role="tab" aria-selected="false">後續醫療資源使用狀況</button>
+      </div>
+    </div>
+
+    <div class="command-filter-card page-time-filter outcome-time-filter" id="outcomeTimeFilter">
+      <div class="command-date-filter">
+        <label>
+          <span>開始日期</span>
+          <input type="date" id="outcomeStartDate" value="2026-01-01">
+        </label>
+        <span class="command-date-arrow">→</span>
+        <label>
+          <span>結束日期</span>
+          <input type="date" id="outcomeEndDate" value="2026-09-25">
+        </label>
+        <button type="button" class="command-apply-btn" id="outcomeApplyRange">套用</button>
+      </div>
+      <div class="command-quick-filter" id="outcomeQuickFilter">
+        <button type="button" data-outcome-range="today">本日</button>
+        <button type="button" data-outcome-range="month">本月</button>
+        <button type="button" data-outcome-range="quarter">本季</button>
+        <button type="button" class="active" data-outcome-range="year">本年度</button>
+      </div>
+    </div>
+
+    <div class="analysis-filter-row outcome-filter-row">
+      <div class="analysis-filter-label">通報類別分析</div>
+      <div class="risk-filter" id="outcomeFilter" aria-label="通報類別篩選">
+        <button type="button" class="risk-filter-btn active" data-filter="all">全部</button>
+        <button type="button" class="risk-filter-btn" data-filter="emergency">緊急醫療</button>
+        <button type="button" class="risk-filter-btn" data-filter="optimized">優化計畫</button>
+      </div>
+    </div>
+
+    <div class="outcome-v62-panel active" data-outcome-panel="improvement">
+      <div class="outcome-legend">
+        <span><i class="outcome-dot improve"></i>改善</span>
+        <span><i class="outcome-dot flat"></i>持平</span>
+        <span><i class="outcome-dot worse"></i>變差</span>
+        <small>點擊任一圓環圖可下探個案資料</small>
+      </div>
+
+      <div class="outcome-grid" id="outcomeGrid">
+        <article class="outcome-card" data-metric="bsrs3" tabindex="0">
+          <div class="outcome-card-head"><h3>BSRS-5 三個月</h3><span class="outcome-n"></span></div>
+          <button type="button" class="outcome-donut-btn" aria-label="查看 BSRS-5 三個月個案明細">
+            <div class="outcome-donut"><div class="outcome-center"><strong class="outcome-avg"></strong><span>平均改善率</span></div></div>
+          </button>
+          <div class="outcome-breakdown"></div>
+        </article>
+
+        <article class="outcome-card" data-metric="bsrs6" tabindex="0">
+          <div class="outcome-card-head"><h3>BSRS-5 六個月</h3><span class="outcome-n"></span></div>
+          <button type="button" class="outcome-donut-btn" aria-label="查看 BSRS-5 六個月個案明細">
+            <div class="outcome-donut"><div class="outcome-center"><strong class="outcome-avg"></strong><span>平均改善率</span></div></div>
+          </button>
+          <div class="outcome-breakdown"></div>
+        </article>
+
+        <article class="outcome-card" data-metric="cgi3" tabindex="0">
+          <div class="outcome-card-head"><h3>CGI-S 三個月</h3><span class="outcome-n"></span></div>
+          <button type="button" class="outcome-donut-btn" aria-label="查看 CGI-S 三個月個案明細">
+            <div class="outcome-donut"><div class="outcome-center"><strong class="outcome-avg"></strong><span>平均改善率</span></div></div>
+          </button>
+          <div class="outcome-breakdown"></div>
+        </article>
+
+        <article class="outcome-card" data-metric="cgi6" tabindex="0">
+          <div class="outcome-card-head"><h3>CGI-S 六個月</h3><span class="outcome-n"></span></div>
+          <button type="button" class="outcome-donut-btn" aria-label="查看 CGI-S 六個月個案明細">
+            <div class="outcome-donut"><div class="outcome-center"><strong class="outcome-avg"></strong><span>平均改善率</span></div></div>
+          </button>
+          <div class="outcome-breakdown"></div>
+        </article>
+
+        <article class="outcome-card" data-metric="gaf3" tabindex="0">
+          <div class="outcome-card-head"><h3>GAF 三個月</h3><span class="outcome-n"></span></div>
+          <button type="button" class="outcome-donut-btn" aria-label="查看 GAF 三個月個案明細">
+            <div class="outcome-donut"><div class="outcome-center"><strong class="outcome-avg"></strong><span>平均改善率</span></div></div>
+          </button>
+          <div class="outcome-breakdown"></div>
+        </article>
+
+        <article class="outcome-card" data-metric="gaf6" tabindex="0">
+          <div class="outcome-card-head"><h3>GAF 六個月</h3><span class="outcome-n"></span></div>
+          <button type="button" class="outcome-donut-btn" aria-label="查看 GAF 六個月個案明細">
+            <div class="outcome-donut"><div class="outcome-center"><strong class="outcome-avg"></strong><span>平均改善率</span></div></div>
+          </button>
+          <div class="outcome-breakdown"></div>
+        </article>
+
+        <article class="outcome-card" data-metric="risk3" tabindex="0">
+          <div class="outcome-card-head"><h3>風險減傷評估 三個月</h3><span class="outcome-n"></span></div>
+          <button type="button" class="outcome-donut-btn" aria-label="查看風險減傷評估三個月個案明細">
+            <div class="outcome-donut"><div class="outcome-center"><strong class="outcome-avg"></strong><span>平均改善率</span></div></div>
+          </button>
+          <div class="outcome-breakdown"></div>
+        </article>
+
+        <article class="outcome-card" data-metric="risk6" tabindex="0">
+          <div class="outcome-card-head"><h3>風險減傷評估 六個月</h3><span class="outcome-n"></span></div>
+          <button type="button" class="outcome-donut-btn" aria-label="查看風險減傷評估六個月個案明細">
+            <div class="outcome-donut"><div class="outcome-center"><strong class="outcome-avg"></strong><span>平均改善率</span></div></div>
+          </button>
+          <div class="outcome-breakdown"></div>
+        </article>
+      </div>
+    </div>
+
+    <div class="outcome-v62-panel" data-outcome-panel="followup" hidden>
+      <div class="outcome-followup-grid">
+        <article class="outcome-followup-cycle-card">
+          <div class="outcome-v62-card-head">
+            <div>
+              <span class="outcome-v62-eyebrow">追蹤量表</span>
+              <h3>結案後 3 個月</h3>
+            </div>
+            <span class="outcome-v62-denominator" id="followup3Expected">應回收 280 份</span>
+          </div>
+
+          <!-- v4：可追蹤率升為主指標（較重要），回收率降為次要 -->
+          <div class="outcome-followup-main">
+            <div class="outcome-followup-main-copy">
+              <span>追蹤量表可追蹤率</span>
+              <strong id="followup3TrackableRate">84.1%</strong>
+              <small id="followup3TrackableCount">185 / 220</small>
+            </div>
+            <div class="outcome-v62-progress"><i id="followup3TrackableBar" style="width:84.1%"></i></div>
+            <p>填表且有寫分數 ÷ 已回收數量</p>
+          </div>
+
+          <div class="outcome-followup-secondary-grid">
+            <div class="outcome-followup-secondary trackable">
+              <span>追蹤量表回收率</span>
+              <strong id="followup3ReturnRate">78.6%</strong>
+              <small id="followup3ReturnCount">220 / 280</small>
+              <p>有填寫評估量表 ÷ 應該回收的數量</p>
+            </div>
+            <div class="outcome-followup-secondary unable">
+              <span>追蹤量表無法填答率</span>
+              <strong id="followup3UnableRate">15.9%</strong>
+              <small id="followup3UnableCount">35 / 220</small>
+              <p>填表且勾選無法填答 ÷ 已回收數量</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="outcome-followup-cycle-card">
+          <div class="outcome-v62-card-head">
+            <div>
+              <span class="outcome-v62-eyebrow">追蹤量表</span>
+              <h3>結案後 6 個月</h3>
+            </div>
+            <span class="outcome-v62-denominator" id="followup6Expected">應回收 240 份</span>
+          </div>
+
+          <!-- v4：可追蹤率升為主指標（較重要），回收率降為次要 -->
+          <div class="outcome-followup-main">
+            <div class="outcome-followup-main-copy">
+              <span>追蹤量表可追蹤率</span>
+              <strong id="followup6TrackableRate">80.8%</strong>
+              <small id="followup6TrackableCount">139 / 172</small>
+            </div>
+            <div class="outcome-v62-progress"><i id="followup6TrackableBar" style="width:80.8%"></i></div>
+            <p>填表且有寫分數 ÷ 已回收數量</p>
+          </div>
+
+          <div class="outcome-followup-secondary-grid">
+            <div class="outcome-followup-secondary trackable">
+              <span>追蹤量表回收率</span>
+              <strong id="followup6ReturnRate">71.7%</strong>
+              <small id="followup6ReturnCount">172 / 240</small>
+              <p>有填寫評估量表 ÷ 應該回收的數量</p>
+            </div>
+            <div class="outcome-followup-secondary unable">
+              <span>追蹤量表無法填答率</span>
+              <strong id="followup6UnableRate">19.2%</strong>
+              <small id="followup6UnableCount">33 / 172</small>
+              <p>填表且勾選無法填答 ÷ 已回收數量</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+
+    <div class="outcome-v62-panel" data-outcome-panel="resource" hidden>
+      <div class="outcome-resource-grid">
+        <article class="outcome-resource-card outcome-resource-monthly">
+          <div class="outcome-v62-card-head">
+            <div>
+              <span class="outcome-v62-eyebrow">已開案後</span>
+              <h3>優化計畫結案每月醫療使用次數變化</h3>
+            </div>
+          </div>
+
+          <div class="outcome-resource-delta-grid">
+            <div class="outcome-resource-delta">
+              <span>每月使用門診次數變化</span>
+              <strong id="resourceOutpatientDelta">−0.8 <em>次 / 月</em></strong>
+              <div class="outcome-resource-axis"><i id="resourceOutpatientMarker" style="left:36%"></i></div>
+              <small>結案時次數 - 第一次評估訪視時次數</small>
+            </div>
+            <div class="outcome-resource-delta">
+              <span>每月使用急診次數變化</span>
+              <strong id="resourceEmergencyDelta">−0.4 <em>次 / 月</em></strong>
+              <div class="outcome-resource-axis"><i id="resourceEmergencyMarker" style="left:43%"></i></div>
+              <small>結案時次數 - 第一次評估訪視時次數</small>
+            </div>
+          </div>
+        </article>
+
+        <article class="outcome-resource-card outcome-resource-aftercare">
+          <div class="outcome-v62-card-head">
+            <div>
+              <span class="outcome-v62-eyebrow">已結案後</span>
+              <h3>後續醫療資源使用成效</h3>
+            </div>
+          </div>
+
+          <div class="outcome-resource-list">
+            <div class="outcome-resource-row">
+              <div><span>個案再住院次數</span><small>結案後住院次數 - 收案/開案時過去一年精神科住院次數</small></div>
+              <strong id="resourceReadmission">−0.38 <em>次 / 人</em></strong>
+            </div>
+            <div class="outcome-resource-row">
+              <div><span>個案身心科門診治療成效</span><small>結案後身心科門診使用次數 - 收案/開案時過去一年精神科門診次數</small></div>
+              <strong id="resourcePsych">+1.60 <em>次 / 人</em></strong>
+            </div>
+            <div class="outcome-resource-row">
+              <div><span>個案居家照護科門診治療成效</span><small>結案後居家照護科門診使用次數 - 收案/開案時過去一年精神科門診次數</small></div>
+              <strong id="resourceHomeCare">+0.72 <em>次 / 人</em></strong>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="page" id="ai" hidden>
+<div class="ai-layout">
+      <section class="ai-scatter-card">
+        <div class="ai-card-head">
+                      <div>
+              <h3>AI 預測與專業評估有多接近</h3>
+              <p>每個點代表一筆個案；越接近斜線，代表 AI 預測越接近專業人員評估。</p>
+            </div>
+            <div class="ai-line-legend" aria-label="圖例">
+              <span><i class="regression"></i>整體趨勢</span>
+              <span><i class="baseline"></i>完全一致</span>
+            </div>
+</div>
+        <div class="ai-scatter-wrap">
+          <svg id="aiScatterSvg" class="ai-scatter-svg" viewBox="0 0 820 620" role="img" aria-label="AI 預測分數與專業評估分數比較圖"></svg>
+          <div id="aiScatterTooltip" class="ai-scatter-tooltip" hidden></div>
+        </div>
+      </section>
+
+      <aside class="ai-right">
+        <div class="ai-kpi-grid">
+          <button type="button" class="ai-kpi-card ai-kpi-clickable" id="openAiCorrelationDialog">
+            <span>預測吻合程度</span>
+            <strong id="aiCorrelation">—</strong>
+            <small>越接近 1，整體越一致</small>
+            <span class="v6-open-hint">點擊查看變化 <i aria-hidden="true">›</i></span>
+          </button>
+          <article class="ai-kpi-card">
+            <span>累積比對資料</span>
+            <strong id="aiPopulation">620</strong>
+            <small>筆 AI 預測與專業評估完整資料</small>
+          </article>
+        </div>
+
+        <article class="ai-explain-card">
+          <h3>本頁面說明</h3>
+
+          <div class="ai-explain-item">
+            <b>這個 AI 用來做什麼？</b>
+            <p>AI 會先依通報內容估算風險分數，協助判斷處理優先順序。結果僅供流程參考，最後仍以專業人員評估為準。</p>
+          </div>
+
+          <div class="ai-explain-item">
+            <b>資料怎麼來？</b>
+            <p>系統會累積「AI 預測」和「專業人員評估」都完整的案件，用來持續檢查 AI 的預測表現。</p>
+          </div>
+
+          <div class="ai-explain-item">
+            <b>圖表怎麼看？</b>
+            <p>每個點是一筆案件。點越靠近斜線，代表 AI 預測和專業評估越接近；離得越遠，差異越大。</p>
+          </div>
+
+          <div class="ai-explain-item">
+            <b>「預測吻合程度」代表什麼？</b>
+            <p>數值越接近 1，表示 AI 預測和專業評估的整體趨勢越一致。這不是診斷正確率。</p>
+          </div>
+        </article>
+      </aside>
+    </div>
+  </section>
+
+  <dialog class="ai-history-dialog" id="aiCorrelationDialog">
+    <div class="ai-history-shell">
+      <div class="ai-history-head">
+        <div>
+          <h3>AI 預測吻合程度變化</h3>
+          <p>查看累積比對資料增加後，AI 預測與專業評估的一致程度是否持續改善。</p>
+        </div>
+        <button type="button" id="closeAiCorrelationDialog" aria-label="關閉">×</button>
+      </div>
+
+      <div class="ai-history-body">
+        <div class="ai-history-chart-wrap">
+          <svg id="aiHistorySvg" class="ai-history-svg" viewBox="0 0 940 500" role="img" aria-label="AI 預測吻合程度歷程圖"></svg>
+          <div class="ai-history-tooltip" id="aiHistoryTooltip" hidden></div>
+        </div>
+
+        <div class="ai-history-foot">
+          <span>X 軸：累積比對資料（筆）</span>
+          <span>Y 軸：吻合程度（越接近 1 越一致）</span>
+        </div>
+      </div>
     </div>
   </dialog>
 
@@ -12057,7 +12885,9 @@
     <div class="analysis-filter-row">
       <span class="analysis-filter-label">通報類別分析</span>
       <div class="risk-filter" id="reporterTypeFilter">
-        <button type="button" class="risk-filter-btn active" data-reporter-type="emergency">緊急醫療</button>
+        <button type="button" class="risk-filter-btn active" data-reporter-type="all">全部</button>
+        <button type="button" class="risk-filter-btn" data-reporter-type="emergency">緊急醫療</button>
+        <button type="button" class="risk-filter-btn" data-reporter-type="optimization">優化計畫</button>
       </div>
       <span class="reporter-range-label" id="reporterRangeLabel" hidden>2026/01/01 - 2026/09/25</span>
     </div>
@@ -12130,11 +12960,377 @@
     <div class="reporter-tooltip" id="reporterTooltip" hidden></div>
   </section>
 
+  <!-- 7 -->
+  <section class="page" id="hospital">
+    <div class="command-filter-card page-time-filter" id="hospitalTimeFilter">
+      <div class="command-date-filter">
+        <label>
+          <span>開始日期</span>
+          <input type="date" id="hospitalStartDate" value="2026-01-01" min="2026-01-01" max="2026-09-25">
+        </label>
+        <span class="command-date-arrow">→</span>
+        <label>
+          <span>結束日期</span>
+          <input type="date" id="hospitalEndDate" value="2026-09-25" min="2026-01-01" max="2026-09-25">
+        </label>
+        <button type="button" class="command-apply-btn" id="hospitalApplyRange">套用</button>
+      </div>
+      <div class="command-quick-filter" id="hospitalQuickFilter">
+        <button type="button" data-hospital-range="today">本日</button>
+        <button type="button" data-hospital-range="month">本月</button>
+        <button type="button" data-hospital-range="quarter">本季</button>
+        <button type="button" class="active" data-hospital-range="year">本年度</button>
+      </div>
+    </div>
+
+    <div class="analysis-filter-row">
+      <span class="analysis-filter-label">通報類別分析</span>
+      <div class="risk-filter" id="hospitalTypeFilter">
+        <button type="button" class="risk-filter-btn active" data-hospital-type="all">全部</button>
+        <button type="button" class="risk-filter-btn" data-hospital-type="emergency">緊急醫療</button>
+        <button type="button" class="risk-filter-btn" data-hospital-type="optimization">優化計畫</button>
+      </div>
+    </div>
+
+    <!-- v9：依客戶「V9 調整」重整指標，分成兩區（版面與數字見檔尾 v9-hospital-indicators／-behavior）：
+         左「優化計畫專屬指標」只算優化計畫個案，選「緊急醫療」時整區隱藏；
+         右「共同指標」緊急醫療＋優化計畫都適用，數字依通報類別切換。
+         移除：緊急醫療／優化計畫結案後轉介至本院醫療系統比例、結案追蹤率。
+         下列數字是本年度、全部的初始值，載入後由 v9 腳本依篩選重算。 -->
+    <div class="hospital-split-layout v9-hospital-layout" id="hospitalSplitLayout">
+      <section class="hospital-his-section hospital-his-right v9-hospital-panel v9-hospital-opt" id="hospitalOptPanel" aria-labelledby="hospitalOptTitle">
+        <div class="hospital-his-head">
+          <div>
+            <h3 id="hospitalOptTitle">優化計畫專屬指標</h3>
+            <p>只算優化計畫個案</p>
+          </div>
+        </div>
+
+        <div class="hospital-his-grid hospital-his-grid-right v9-hospital-grid">
+          <article class="hospital-his-card ratio v9-referral-card">
+            <div class="hospital-his-label">優化計畫結案個案轉介率</div>
+            <strong data-v9-rate="referral">52.3%</strong>
+            <div class="hospital-his-detail" data-v9-count="referral">任一項有轉介 90 / 172 人</div>
+            <div class="hospital-his-bar"><i data-v9-bar="referral" style="width:52.3%"></i></div>
+            <!-- 結案訪視紀錄單「醫療資源轉介」的四個選項（V9 追加確認：醫療資源、社區支持資源、社區心理衛生中心、EIP計畫） -->
+            <ul class="v9-referral-split" id="hospitalReferralSplit" title="四項各自的轉介人數 ÷ 收案總人數（一人可勾多項）">
+              <li data-v9-option="medical" title="醫療資源：68 / 172 人"><span>醫療資源</span><b>39.5%</b></li>
+              <li data-v9-option="community" title="社區支持資源：20 / 172 人"><span>社區支持資源</span><b>11.6%</b></li>
+              <li data-v9-option="cmhc" title="社區心理衛生中心：17 / 172 人"><span>社區心理衛生中心</span><b>9.9%</b></li>
+              <li data-v9-option="eip" title="EIP計畫：8 / 172 人"><span>EIP計畫</span><b>4.7%</b></li>
+            </ul>
+          </article>
+
+          <article class="hospital-his-card ratio v9-alert">
+            <div class="hospital-his-label">優化計畫機構結案失聯率</div>
+            <strong data-v9-rate="lost">5.8%</strong>
+            <div class="hospital-his-detail" data-v9-count="lost">10 / 172 人</div>
+            <div class="hospital-his-bar"><i data-v9-bar="lost" style="width:5.8%"></i></div>
+            <small>未完成處遇即失聯人數 ÷ 優化計畫收案人數</small>
+          </article>
+
+          <article class="hospital-his-card ratio v9-alert">
+            <div class="hospital-his-label">優化計畫機構結案拒訪率</div>
+            <strong data-v9-rate="refused">4.1%</strong>
+            <div class="hospital-his-detail" data-v9-count="refused">7 / 172 人</div>
+            <div class="hospital-his-bar"><i data-v9-bar="refused" style="width:4.1%"></i></div>
+            <small>未完成處遇即拒訪人數 ÷ 優化計畫收案人數</small>
+          </article>
+
+          <article class="hospital-his-card unable-summary" data-hospital-kind="optimization" id="hospitalUnableCard" role="button" tabindex="0" aria-haspopup="dialog">
+            <div class="hospital-his-label">優化計畫無法收案</div>
+            <strong><span id="hospitalUnableCardTotal">60</span> <em>件</em></strong>
+            <div class="hospital-his-detail" id="hospitalUnableTop">最多：住院 12 件（20.0%）</div>
+            <span class="v6-open-hint">點擊查看各無法收案原因人數與占比 <i aria-hidden="true">›</i></span>
+          </article>
+
+          <article class="hospital-his-card delta v9-neutral v9-monthly" data-v9-delta="monthlyOpd">
+            <div class="hospital-his-label">已開案後個案每月使用門診次數變化</div>
+            <strong data-v9-strong>−0.7 <em>次 / 月</em></strong>
+            <div class="hospital-his-trend" data-v9-trend>↓ 結案時較第一次評估訪視減少</div>
+            <div class="v9-axis-row" aria-hidden="true"><span>−3</span><div class="v9-axis"><i data-v9-marker style="left:38.7%"></i></div><span>+3</span></div>
+            <small>結案時次數 − 第一次評估訪視時次數</small>
+          </article>
+
+          <article class="hospital-his-card delta good v9-monthly" data-v9-delta="monthlyEr">
+            <div class="hospital-his-label">已開案後個案每月使用急診次數變化</div>
+            <strong data-v9-strong>−0.3 <em>次 / 月</em></strong>
+            <div class="hospital-his-trend" data-v9-trend>↓ 結案時較第一次評估訪視減少</div>
+            <div class="v9-axis-row" aria-hidden="true"><span>−3</span><div class="v9-axis"><i data-v9-marker style="left:44.8%"></i></div><span>+3</span></div>
+            <small>結案時次數 − 第一次評估訪視時次數</small>
+          </article>
+        </div>
+      </section>
+
+      <section class="hospital-his-section hospital-his-right v9-hospital-panel v9-hospital-shared" id="hospitalSharedPanel" aria-labelledby="hospitalSharedTitle">
+        <div class="hospital-his-head">
+          <div>
+            <h3 id="hospitalSharedTitle">共同指標</h3>
+            <p>緊急醫療＋優化計畫</p>
+          </div>
+        </div>
+
+        <div class="hospital-his-grid hospital-his-grid-right v9-hospital-grid">
+          <article class="hospital-his-card delta good" data-v9-delta="readmission">
+            <div class="hospital-his-label">已結案後個案再住院次數</div>
+            <strong data-v9-strong>−0.38 <em>次 / 人</em></strong>
+            <div class="hospital-his-trend" data-v9-trend>↓ 較收案前一年減少</div>
+            <small>結案後住院次數 − 收案／開案時過去一年精神科住院次數</small>
+          </article>
+
+          <article class="hospital-his-card delta good" data-v9-delta="psych">
+            <div class="hospital-his-label">已結案後個案身心科門診治療成效</div>
+            <strong data-v9-strong>+1.60 <em>次 / 人</em></strong>
+            <div class="hospital-his-trend" data-v9-trend>↑ 結案後門診使用增加</div>
+            <small>結案後身心科門診使用次數 − 收案／開案時過去一年精神科門診次數</small>
+          </article>
+
+          <article class="hospital-his-card delta good" data-v9-delta="home">
+            <div class="hospital-his-label">已結案後個案居家照護科門診治療成效</div>
+            <strong data-v9-strong>+0.72 <em>次 / 人</em></strong>
+            <div class="hospital-his-trend" data-v9-trend>↑ 結案後居家照護使用增加</div>
+            <small>結案後居家照護科門診使用次數 − 收案／開案時過去一年精神科門診次數</small>
+          </article>
+
+          <article class="hospital-his-card v9-scope-card">
+            <div class="hospital-his-label">指標計算說明</div>
+            <p>共同指標依上方「通報類別分析」切換；專屬指標只算優化計畫個案，選「緊急醫療」時隱藏。</p>
+            <button type="button" class="hospital-his-info-btn" id="openHospitalHisInfo">各指標公式與資料來源</button>
+          </article>
+        </div>
+      </section>
+    </div>
+
+    <!-- v5：左側「優化計畫無法收案」收成右側一張卡片，點擊後以 dialog 顯示完整原因表 -->
+    <dialog class="v5-dialog hospital-unable-dialog" id="hospitalUnableDialog" aria-labelledby="hospitalUnableDialogTitle">
+      <div class="v5-dialog-shell">
+        <div class="v5-dialog-head">
+          <div>
+            <span class="v5-dialog-eyebrow">醫療機構端處理成效分析</span>
+            <h3 id="hospitalUnableDialogTitle">優化計畫無法收案原因</h3>
+          </div>
+          <button type="button" class="v5-dialog-close" data-close-dialog aria-label="關閉">×</button>
+        </div>
+        <div class="v5-dialog-body">
+          <article class="hospital-card hospital-unable-card hospital-unable-full" data-hospital-kind="optimization">
+            <div class="hospital-card-head hospital-unable-head">
+              <div>
+                <h3>優化計畫無法收案</h3>
+              </div>
+              <div class="hospital-unable-total">
+                <span>總無法收案</span>
+                <strong id="hospitalUnableTotal">60</strong>
+              </div>
+            </div>
+
+            <div class="hospital-unable-table-wrap hospital-unable-table-full">
+              <table class="hospital-unable-table">
+                <thead>
+                  <tr>
+                    <th>無法收案原因</th>
+                    <th class="count-col">
+                      <button type="button" id="hospitalUnableSort">
+                        人數 <span id="hospitalUnableSortIcon">↓</span>
+                      </button>
+                    </th>
+                    <th>百分比</th>
+                  </tr>
+                </thead>
+                <tbody id="hospitalUnableTbody"></tbody>
+              </table>
+            </div>
+
+            <div class="hospital-unable-foot">
+              百分比＝各原因無法收案數量 ÷ 總無法收案數量
+            </div>
+          </article>
+        </div>
+      </div>
+    </dialog>
+  </section>
+
+  <!-- 8: Hospital internal control indicators（qa：先隱藏，見主選單按鈕旁的註解） -->
+  <section class="page" id="snq" hidden>
+    <div class="command-filter-card page-time-filter" id="snqTimeFilter">
+      <div class="command-date-filter">
+        <label>
+          <span>開始日期</span>
+          <input type="date" id="snqStartDate" value="2026-01-01" min="2026-01-01" max="2026-09-25">
+        </label>
+        <span class="command-date-arrow">→</span>
+        <label>
+          <span>結束日期</span>
+          <input type="date" id="snqEndDate" value="2026-09-25" min="2026-01-01" max="2026-09-25">
+        </label>
+        <button type="button" class="command-apply-btn" id="snqApplyRange">套用</button>
+      </div>
+      <div class="command-quick-filter" id="snqQuickFilter">
+        <button type="button" data-snq-range="today">本日</button>
+        <button type="button" data-snq-range="month">本月</button>
+        <button type="button" data-snq-range="quarter">本季</button>
+        <button type="button" class="active" data-snq-range="year">本年度</button>
+      </div>
+    </div>
+
+    <div class="analysis-filter-row">
+      <span class="analysis-filter-label">通報類別分析</span>
+      <div class="risk-filter" id="snqTypeFilter">
+        <button type="button" class="risk-filter-btn active" data-snq-type="all">全部</button>
+        <button type="button" class="risk-filter-btn" data-snq-type="emergency">緊急醫療</button>
+        <button type="button" class="risk-filter-btn" data-snq-type="optimization">優化計畫</button>
+      </div>
+    </div>
+
+    <div class="snq-dashboard">
+      <section class="snq-section snq-core-section">
+        <div class="snq-section-head">
+          <div>
+            <h3>院內追蹤與再住院指標</h3>
+            <p>門診／居家醫療持續治療與再住院情形</p>
+          </div>
+        </div>
+        <div class="snq-grid snq-grid-four">
+          <article class="snq-card" data-snq-kind="shared" data-snq-metric="homecareFollow" data-snq-base="82.6" data-snq-numerator="119" data-snq-denominator="144">
+            <div class="snq-card-title">居家醫療個案門診追蹤率</div>
+            <div class="snq-card-value"><strong>82.6%</strong><span>119 / 144 人</span></div>
+            <div class="snq-progress"><i style="width:82.6%"></i></div>
+            <p>初診為居家醫療個案且在Ｘ年中每年均穩定於門診或居家醫療穩定治療4次以上個案／初診為居家醫療(門診)個案，其中只有中間有中斷即不納入次年計算。</p>
+          </article>
+
+          <article class="snq-card" data-snq-kind="shared" data-snq-metric="compulsoryFollow" data-snq-base="76.4" data-snq-numerator="84" data-snq-denominator="110">
+            <div class="snq-card-title">強制住院個案出院後門診追蹤率</div>
+            <div class="snq-card-value"><strong>76.4%</strong><span>84 / 110 人</span></div>
+            <div class="snq-progress"><i style="width:76.4%"></i></div>
+            <p>強制住院個案出院後個案且在Ｘ年中每年均穩定於門診或居家醫療穩定治療4次以上個案／強制住院個案出院人數，其中只有中間有中斷即不納入次年計算。</p>
+          </article>
+
+          <article class="snq-card snq-card-alert" data-snq-kind="shared" data-snq-metric="homecareReadmit" data-snq-base="18.1" data-snq-numerator="26" data-snq-denominator="144">
+            <div class="snq-card-title">初診為居家醫療病人再住院率</div>
+            <div class="snq-card-value"><strong>18.1%</strong><span>26 / 144 人</span></div>
+            <div class="snq-progress"><i style="width:18.1%"></i></div>
+            <p>再住院個案數／初診為居家醫療病人數。</p>
+          </article>
+
+          <article class="snq-card snq-card-alert" data-snq-kind="shared" data-snq-metric="compulsoryReadmit" data-snq-base="23.6" data-snq-numerator="26" data-snq-denominator="110">
+            <div class="snq-card-title">強制住院病人再住院率</div>
+            <div class="snq-card-value"><strong>23.6%</strong><span>26 / 110 人</span></div>
+            <div class="snq-progress"><i style="width:23.6%"></i></div>
+            <p>再住院個案數／強制住院病人數。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="snq-section snq-referral-section">
+        <div class="snq-section-head">
+          <div>
+            <h3>通報結案後醫療銜接</h3>
+            <p>結案後是否持續銜接本院 HIS 醫療紀錄</p>
+          </div>
+        </div>
+        <div class="snq-grid snq-grid-two" id="snqReferralGrid">
+          <article class="snq-card snq-card-referral" data-snq-kind="emergency" data-snq-base="68.4" data-snq-numerator="104" data-snq-denominator="152">
+            <div class="snq-card-title">緊急醫療結案後轉介至本院醫療系統比例</div>
+            <div class="snq-card-value"><strong>68.4%</strong><span>104 / 152 件</span></div>
+            <div class="snq-progress"><i style="width:68.4%"></i></div>
+            <span class="snq-open-hint">點擊查看門診／居家／住院各自比例 <i aria-hidden="true">›</i></span>
+            <div class="snq-breakdown" hidden>
+              <div class="snq-breakdown-grid">
+                <div class="snq-sub opd" data-snq-sub-base="62.5" title="(於結案日後在 HIS 系統有門診就醫紀錄之個案數/總通報個案數)*100%">
+                  <span class="snq-sub-label">門診</span>
+                  <strong>62.5%</strong>
+                  <em>95 / 152 件</em>
+                  <div class="snq-sub-bar"><i style="width:62.5%"></i></div>
+                </div>
+                <div class="snq-sub home" data-snq-sub-base="21.1" title="(於結案日後在 HIS 系統有居家就醫紀錄之個案數/總通報個案數)*100%">
+                  <span class="snq-sub-label">居家</span>
+                  <strong>21.1%</strong>
+                  <em>32 / 152 件</em>
+                  <div class="snq-sub-bar"><i style="width:21.1%"></i></div>
+                </div>
+                <div class="snq-sub inpatient" data-snq-sub-base="27.6" title="(於結案日後在 HIS 系統有住院就醫紀錄之個案數/總通報個案數)*100%">
+                  <span class="snq-sub-label">住院</span>
+                  <strong>27.6%</strong>
+                  <em>42 / 152 件</em>
+                  <div class="snq-sub-bar"><i style="width:27.6%"></i></div>
+                </div>
+              </div>
+              <div class="snq-breakdown-note">
+                <b>※ 單一個案可能會有重複醫療處置，所以三項比例相加可能會超過100%</b>
+                <span class="snq-breakdown-sum">三項合計 <em>111.2%</em></span>
+              </div>
+              <div class="snq-breakdown-formula">各項比例＝(於結案日後在 HIS 系統有該項就醫紀錄之個案數/總通報個案數)*100%</div>
+            </div>
+            <p>(於結案日後在 HIS 系統有門診、居家或住院就醫紀錄之總個案數/總通報個案數)*100%</p>
+          </article>
+
+          <article class="snq-card snq-card-referral" data-snq-kind="optimization" data-snq-base="54.8" data-snq-numerator="121" data-snq-denominator="221">
+            <div class="snq-card-title">優化計劃結案後轉介至本院醫療系統比例</div>
+            <div class="snq-card-value"><strong>54.8%</strong><span>121 / 221 件</span></div>
+            <div class="snq-progress"><i style="width:54.8%"></i></div>
+            <span class="snq-open-hint">點擊查看門診／居家／住院各自比例 <i aria-hidden="true">›</i></span>
+            <div class="snq-breakdown" hidden>
+              <div class="snq-breakdown-grid">
+                <div class="snq-sub opd" data-snq-sub-base="54.3" title="(於結案日後在 HIS 系統有門診就醫紀錄之個案數/總通報個案數)*100%">
+                  <span class="snq-sub-label">門診</span>
+                  <strong>54.3%</strong>
+                  <em>120 / 221 件</em>
+                  <div class="snq-sub-bar"><i style="width:54.3%"></i></div>
+                </div>
+                <div class="snq-sub home" data-snq-sub-base="30.8" title="(於結案日後在 HIS 系統有居家就醫紀錄之個案數/總通報個案數)*100%">
+                  <span class="snq-sub-label">居家</span>
+                  <strong>30.8%</strong>
+                  <em>68 / 221 件</em>
+                  <div class="snq-sub-bar"><i style="width:30.8%"></i></div>
+                </div>
+                <div class="snq-sub inpatient" data-snq-sub-base="27.1" title="(於結案日後在 HIS 系統有住院就醫紀錄之個案數/總通報個案數)*100%">
+                  <span class="snq-sub-label">住院</span>
+                  <strong>27.1%</strong>
+                  <em>60 / 221 件</em>
+                  <div class="snq-sub-bar"><i style="width:27.1%"></i></div>
+                </div>
+              </div>
+              <div class="snq-breakdown-note">
+                <b>※ 單一個案可能會有重複醫療處置，所以三項比例相加可能會超過100%</b>
+                <span class="snq-breakdown-sum">三項合計 <em>112.2%</em></span>
+              </div>
+              <div class="snq-breakdown-formula">各項比例＝(於結案日後在 HIS 系統有該項就醫紀錄之個案數/總通報個案數)*100%</div>
+            </div>
+            <p>(於結案日後在 HIS 系統有門診、居家或住院就醫紀錄之總個案數/總通報個案數)*100%</p>
+          </article>
+        </div>
+      </section>
+    </div>
+
+    <!-- v5：點擊「結案後轉介至本院醫療系統比例」卡片開啟 -->
+    <dialog class="v5-dialog snq-referral-dialog" id="snqReferralDialog" aria-labelledby="snqReferralDialogTitle">
+      <div class="v5-dialog-shell">
+        <div class="v5-dialog-head">
+          <div>
+            <span class="v5-dialog-eyebrow">醫院內控指標(SNQ)｜轉介去向</span>
+            <h3 id="snqReferralDialogTitle">結案後轉介至本院醫療系統比例</h3>
+          </div>
+          <button type="button" class="v5-dialog-close" data-close-dialog aria-label="關閉">×</button>
+        </div>
+        <div class="v5-dialog-body">
+          <div class="snq-dialog-summary">
+            <div><span>任一項（門診、居家或住院）</span><strong id="snqReferralDialogValue">68.4%</strong></div>
+            <em id="snqReferralDialogCount">104 / 152 件</em>
+          </div>
+          <div class="snq-dialog-breakdown" id="snqReferralDialogBody"></div>
+        </div>
+      </div>
+    </dialog>
+  </section>
+
   <!-- 9 -->
   <section class="page" id="command">
     <div class="command-view-tabs" id="commandViewTabs" role="tablist" aria-label="指揮儀表板檢視">
       <button type="button" class="command-view-tab active" data-command-view="flow" role="tab" aria-selected="true">指揮板</button>
       <button type="button" class="command-view-tab" data-command-view="closure" role="tab" aria-selected="false">結案率</button>
+      <!-- 同期比較：三年欄位保留，比較期間整段早於平台起始日 2026/10/05 的年份標示「平台未啟用」（使用者 2026-11-11 決定，見 qa-data 的 comparePeriods()） -->
+      <button type="button" class="command-view-tab" data-command-view="comparison" role="tab" aria-selected="false">同期比較</button>
+      <!-- 平台使用率先隱藏（使用者 2026-11-11 指示，與醫院內控指標一起）。#commandUsageView 與 renderUsage() 都保留，恢復時拿掉這段註解，並把 qa-data 的 SHOW_PLATFORM 改成 true -->
+      <!-- <button type="button" class="command-view-tab" data-command-view="usage" role="tab" aria-selected="false">平台使用率</button> -->
     </div>
 
     <div class="command-view active" id="commandFlowView" data-command-panel="flow">
@@ -12176,36 +13372,36 @@
                     id="commandTotalNode"
                     aria-expanded="true">
               <span>總通報案件</span>
-              <strong id="commandTotal">220</strong>
+              <strong id="commandTotal">800</strong>
               <small>100.0%</small>
             </button>
 
             <article class="interactive-flow-card overall-status pending" id="overallPendingCard">
               <span>待派案件數</span>
-              <strong id="commandPending">12</strong>
-              <small id="commandPendingPct">5.5%</small>
+              <strong id="commandPending">35</strong>
+              <small id="commandPendingPct">4.4%</small>
             </article>
 
             <article class="interactive-flow-card overall-status assigned" id="overallAssignedCard">
               <span>已派案件數</span>
-              <strong id="commandAssigned">48</strong>
-              <small id="commandAssignedPct">21.8%</small>
+              <strong id="commandAssigned">145</strong>
+              <small id="commandAssignedPct">18.1%</small>
             </article>
 
             <article class="interactive-flow-card overall-status closed" id="overallClosedCard">
               <span>結案件數</span>
-              <strong id="commandClosed">120</strong>
-              <small id="commandClosedPct">54.5%</small>
+              <strong id="commandClosed">480</strong>
+              <small id="commandClosedPct">60.0%</small>
             </article>
 
             <article class="interactive-flow-card overall-status notaccepted" id="overallNotAcceptedCard">
               <span>未轉介 / 開案件數</span>
-              <strong id="commandNotAccepted">40</strong>
-              <small id="commandNotAcceptedPct">18.2%</small>
+              <strong id="commandNotAccepted">140</strong>
+              <small id="commandNotAcceptedPct">17.5%</small>
             </article>
           </section>
 
-          <!-- 右側：通報類別（本檔只保留緊急醫療）；總通報案件點擊後才出現 -->
+          <!-- 右側：四種通報類別；總通報案件點擊後才出現 -->
           <section class="interactive-category-column is-open" id="interactiveCategoryColumn">
 
             <div class="interactive-category-row" data-category-row="emergency">
@@ -12216,7 +13412,7 @@
                       aria-expanded="true">
                 <span>緊急醫療</span>
                 <strong id="commandEmergency">220</strong>
-                <small><span id="commandEmergencyPct">100.0%</span></small>
+                <small><span id="commandEmergencyPct">27.5%</span></small>
               </button>
 
               <div class="interactive-detail-group is-open" data-detail-group="emergency">
@@ -12239,6 +13435,111 @@
                   <span>未轉介 / 開案件數</span>
                   <strong id="commandEmergencyNotAccepted">40</strong>
                   <small id="commandEmergencyNotAcceptedPct">18.2%</small>
+                </article>
+              </div>
+            </div>
+
+            <div class="interactive-category-row" data-category-row="class1">
+              <button type="button"
+                      class="interactive-flow-card category-trigger class1"
+                      id="categoryClass1Card"
+                      data-category="class1"
+                      aria-expanded="true">
+                <span>第一類優化計畫</span>
+                <strong id="commandClass1">180</strong>
+                <small><span id="commandClass1Pct">22.5%</span></small>
+              </button>
+
+              <div class="interactive-detail-group is-open" data-detail-group="class1">
+                <article class="interactive-flow-card detail-card pending" id="class1PendingCard">
+                  <span>待派案件數</span>
+                  <strong id="commandClass1Pending">5</strong>
+                  <small id="commandClass1PendingPct">2.8%</small>
+                </article>
+                <article class="interactive-flow-card detail-card assigned" id="class1AssignedCard">
+                  <span>已派案件數</span>
+                  <strong id="commandClass1Assigned">30</strong>
+                  <small id="commandClass1AssignedPct">16.7%</small>
+                </article>
+                <article class="interactive-flow-card detail-card closed" id="class1ClosedCard">
+                  <span>結案件數</span>
+                  <strong id="commandClass1Closed">115</strong>
+                  <small id="commandClass1ClosedPct">63.9%</small>
+                </article>
+                <article class="interactive-flow-card detail-card notaccepted" id="class1NotAcceptedCard">
+                  <span>未轉介 / 開案件數</span>
+                  <strong id="commandClass1NotAccepted">30</strong>
+                  <small id="commandClass1NotAcceptedPct">16.7%</small>
+                </article>
+              </div>
+            </div>
+
+            <div class="interactive-category-row" data-category-row="class2">
+              <button type="button"
+                      class="interactive-flow-card category-trigger class2"
+                      id="categoryClass2Card"
+                      data-category="class2"
+                      aria-expanded="true">
+                <span>第二類優化計畫</span>
+                <strong id="commandClass2">210</strong>
+                <small><span id="commandClass2Pct">26.3%</span></small>
+              </button>
+
+              <div class="interactive-detail-group is-open" data-detail-group="class2">
+                <article class="interactive-flow-card detail-card pending" id="class2PendingCard">
+                  <span>待派案件數</span>
+                  <strong id="commandClass2Pending">8</strong>
+                  <small id="commandClass2PendingPct">3.8%</small>
+                </article>
+                <article class="interactive-flow-card detail-card assigned" id="class2AssignedCard">
+                  <span>已派案件數</span>
+                  <strong id="commandClass2Assigned">38</strong>
+                  <small id="commandClass2AssignedPct">18.1%</small>
+                </article>
+                <article class="interactive-flow-card detail-card closed" id="class2ClosedCard">
+                  <span>結案件數</span>
+                  <strong id="commandClass2Closed">125</strong>
+                  <small id="commandClass2ClosedPct">59.5%</small>
+                </article>
+                <article class="interactive-flow-card detail-card notaccepted" id="class2NotAcceptedCard">
+                  <span>未轉介 / 開案件數</span>
+                  <strong id="commandClass2NotAccepted">39</strong>
+                  <small id="commandClass2NotAcceptedPct">18.6%</small>
+                </article>
+              </div>
+            </div>
+
+            <div class="interactive-category-row" data-category-row="class3">
+              <button type="button"
+                      class="interactive-flow-card category-trigger class3"
+                      id="categoryClass3Card"
+                      data-category="class3"
+                      aria-expanded="true">
+                <span>第三類優化計畫</span>
+                <strong id="commandClass3">190</strong>
+                <small><span id="commandClass3Pct">23.8%</span></small>
+              </button>
+
+              <div class="interactive-detail-group is-open" data-detail-group="class3">
+                <article class="interactive-flow-card detail-card pending" id="class3PendingCard">
+                  <span>待派案件數</span>
+                  <strong id="commandClass3Pending">10</strong>
+                  <small id="commandClass3PendingPct">5.3%</small>
+                </article>
+                <article class="interactive-flow-card detail-card assigned" id="class3AssignedCard">
+                  <span>已派案件數</span>
+                  <strong id="commandClass3Assigned">29</strong>
+                  <small id="commandClass3AssignedPct">15.3%</small>
+                </article>
+                <article class="interactive-flow-card detail-card closed" id="class3ClosedCard">
+                  <span>結案件數</span>
+                  <strong id="commandClass3Closed">120</strong>
+                  <small id="commandClass3ClosedPct">63.2%</small>
+                </article>
+                <article class="interactive-flow-card detail-card notaccepted" id="class3NotAcceptedCard">
+                  <span>未轉介 / 開案件數</span>
+                  <strong id="commandClass3NotAccepted">31</strong>
+                  <small id="commandClass3NotAcceptedPct">16.3%</small>
                 </article>
               </div>
             </div>
@@ -12352,6 +13653,122 @@
         </div>
       </article>
     </div>
+
+    <div class="command-view" id="commandComparisonView" data-command-panel="comparison" hidden>
+      <div class="command-compare-toolbar">
+        <div class="command-compare-mode-wrap">
+          <div class="command-compare-mode" id="commandCompareMode">
+            <button type="button" data-mode="month">同月比較</button>
+            <button type="button" class="active" data-mode="ytd">同期累計</button>
+            <button type="button" data-mode="customMonth">其他月份比較</button>
+          </div>
+
+          <label class="command-compare-month-select" id="commandCompareMonthSelect" hidden>
+            <span>選擇月份</span>
+            <select id="commandCompareMonth">
+              <option value="1">1 月</option>
+              <option value="2">2 月</option>
+              <option value="3">3 月</option>
+              <option value="4">4 月</option>
+              <option value="5">5 月</option>
+              <option value="6">6 月</option>
+              <option value="7">7 月</option>
+              <option value="8">8 月</option>
+              <option value="9" selected>9 月</option>
+              <option value="10">10 月</option>
+              <option value="11">11 月</option>
+              <option value="12">12 月</option>
+            </select>
+          </label>
+        </div>
+        <div class="command-compare-range">
+          <strong id="commandCompareRangeTitle">同期累計｜1/1－9/25</strong>
+          <span id="commandCompareRangeNote">比較近三年相同期間</span>
+        </div>
+      </div>
+
+      <!-- v5：同期比較改為比較「案件處理效率指標」，並可依通報類別篩選 -->
+      <div class="analysis-filter-row command-compare-filter-row">
+        <span class="analysis-filter-label">通報類別分析</span>
+        <div class="risk-filter" id="commandCompareTypeFilter">
+          <button type="button" class="risk-filter-btn active" data-compare-type="all">全部</button>
+          <button type="button" class="risk-filter-btn" data-compare-type="emergency">緊急醫療</button>
+          <button type="button" class="risk-filter-btn" data-compare-type="optimization">優化計畫</button>
+        </div>
+        <span class="command-compare-legend">
+          <i class="better"></i>較去年改善
+          <i class="worse"></i>較去年退步
+          <i class="neutral"></i>僅供參考（占比類）
+        </span>
+      </div>
+
+      <div class="command-compare-metrics" id="commandCompareMetrics"></div>
+    </div>
+
+    <!-- v8：平台使用率。版面沿用「結案率」的 closure-v74 樣式，數字由 v8-platform-usage-behavior 依 USAGE_UNITS 填入 -->
+    <div class="command-view" id="commandUsageView" data-command-panel="usage" hidden>
+      <article class="closure-v74-shell">
+        <div class="closure-v74-head">
+          <div>
+            <span class="closure-v74-eyebrow">帳號使用</span>
+            <h3>平台使用率</h3>
+            <p>帳號建立後曾登入過的帳號數 ÷ 平台總帳號數；尚未登入過的帳號算在總帳號數內</p>
+          </div>
+          <div class="closure-v74-head-note">
+            <span class="closure-v74-note-dot"></span>
+            <span>使用率</span>
+          </div>
+        </div>
+
+        <div class="closure-v74-body">
+          <section class="closure-v74-hero" aria-label="全平台使用率">
+            <div class="closure-v74-hero-top">
+              <div>
+                <span class="closure-v74-section-label">全平台</span>
+                <h4>平台使用率</h4>
+              </div>
+              <span class="closure-v74-roc-chip" id="usageAsOf">統計至 —</span>
+            </div>
+
+            <div class="closure-v74-donut-wrap">
+              <div class="closure-v74-donut" id="usageDonut" role="img">
+                <div class="closure-v74-donut-center">
+                  <!-- 舊層把 strong 裡的 span 縮成 .38em 當單位用，所以數字是 strong 的文字節點（同結案率） -->
+                  <strong id="usageRate">0<span>%</span></strong>
+                  <small>使用率</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="closure-v74-counts">
+              <div>
+                <span>曾登入</span>
+                <strong id="usageLoggedIn"></strong>
+                <small>個帳號</small>
+              </div>
+              <i></i>
+              <div>
+                <span>總帳號</span>
+                <strong id="usageTotal"></strong>
+                <small>個帳號</small>
+              </div>
+            </div>
+          </section>
+
+          <section class="closure-v74-trend" aria-label="各單位平台使用率">
+            <div class="closure-v74-trend-head">
+              <div>
+                <span class="closure-v74-section-label">各單位</span>
+                <h4>各單位平台使用率</h4>
+              </div>
+              <span class="closure-v74-period">依使用率排序</span>
+            </div>
+
+            <div class="closure-v74-list" id="usageUnitList"></div>
+          </section>
+        </div>
+      </article>
+    </div>
   </section>
 </div>
 
@@ -12427,6 +13844,46 @@
   </div>
 </dialog>
 
+
+<dialog class="outcome-dialog" id="outcomeDetailDialog">
+  <div class="outcome-dialog-head">
+    <div>
+      <h3 id="outcomeDialogTitle">BSRS-5 三個月｜個案明細</h3>
+      <p id="outcomeDialogSubtitle">持平閾值：-1.0% ～ +1.0%（含）；&gt; +1.0% 為改善，&lt; -1.0% 為變差。</p>
+    </div>
+    <button type="button" class="outcome-dialog-close" id="closeOutcomeDialog" aria-label="關閉">×</button>
+  </div>
+  <div class="outcome-dialog-toolbar">
+    <div class="outcome-status-filter" id="outcomeStatusFilter">
+      <button type="button" class="outcome-status-btn active" data-status="all">全部</button>
+      <button type="button" class="outcome-status-btn" data-status="改善">改善</button>
+      <button type="button" class="outcome-status-btn" data-status="持平">持平</button>
+      <button type="button" class="outcome-status-btn" data-status="變差">變差</button>
+    </div>
+    <div class="outcome-dialog-summary" id="outcomeDialogSummary"></div>
+  </div>
+  <div class="outcome-table-wrap">
+    <table class="outcome-table">
+      <thead>
+        <tr>
+          <th>
+            <button type="button" class="outcome-sort-btn" data-sort="category">
+              通報類別 <span class="outcome-sort-icon" aria-hidden="true"></span>
+            </button>
+          </th>
+          <th>
+            <button type="button" class="outcome-sort-btn active desc" data-sort="change">
+              改善百分比 <span class="outcome-sort-icon" aria-hidden="true">↓</span>
+            </button>
+          </th>
+          <th>改善類別</th>
+        </tr>
+      </thead>
+      <tbody id="outcomeDetailBody"></tbody>
+    </table>
+    <div class="outcome-dialog-empty" id="outcomeDialogEmpty">目前沒有符合條件的個案</div>
+  </div>
+</dialog>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -13371,6 +14828,59 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 
+<dialog class="hospital-his-dialog" id="hospitalHisDialog">
+  <div class="hospital-his-dialog-shell">
+    <div class="hospital-his-dialog-head">
+      <div>
+        <h3>指標計算說明</h3>
+        <p>醫療機構端處理成效分析</p>
+      </div>
+      <button type="button" id="closeHospitalHisInfo" aria-label="關閉">×</button>
+    </div>
+    <!-- v9：配合頁面重整，改列 v9 的九項指標，依「優化計畫專屬／共同指標」分組 -->
+    <div class="hospital-his-dialog-body">
+      <div class="v9-formula-group">優化計畫專屬指標<span>平台資料，只算優化計畫個案</span></div>
+      <div class="hospital-his-formula">
+        <b>疑似或社區精神病人照護優化計畫結案個案轉介率</b>
+        <span>（結案個案轉介資源人數 ÷ 收案總人數）×100%。依結案訪視紀錄單「醫療資源轉介」的四個選項（醫療資源、社區支持資源、社區心理衛生中心、EIP計畫）：任一項有轉介就計入分子；四項另各自計算（該項轉介人數 ÷ 收案總人數），一人可勾多項，四項相加會超過「任一項」</span>
+      </div>
+      <div class="hospital-his-formula">
+        <b>疑似或社區精神病人照護優化計畫機構結案失聯率</b>
+        <span>（未完成處遇即失聯人數 ÷ 疑似或社區精神病人照護優化計畫收案人數）×100%</span>
+      </div>
+      <div class="hospital-his-formula">
+        <b>疑似或社區精神病人照護優化計畫機構結案拒訪率</b>
+        <span>（未完成處遇即拒訪人數 ÷ 疑似或社區精神病人照護優化計畫收案人數）×100%</span>
+      </div>
+      <div class="hospital-his-formula">
+        <b>優化計畫無法收案</b>
+        <span>醫療機構端回覆為無法收案的案件數，另列件數最多的原因與占比；各原因百分比＝該原因無法收案數 ÷ 總無法收案數</span>
+      </div>
+      <div class="hospital-his-formula">
+        <b>已開案後個案每月使用門診次數變化</b>
+        <span>結案時每月使用門診次數 − 第一次評估訪視時每月使用門診次數（各個案相減後取平均）</span>
+      </div>
+      <div class="hospital-his-formula">
+        <b>已開案後個案每月使用急診次數變化</b>
+        <span>結案時每月使用急診次數 − 第一次評估訪視時每月使用急診次數（各個案相減後取平均）</span>
+      </div>
+      <div class="v9-formula-group">共同指標<span>HIS 資料，緊急醫療＋優化計畫，依通報類別篩選</span></div>
+      <div class="hospital-his-formula">
+        <b>已結案後個案再住院次數</b>
+        <span>結案後住院次數 − 收案／開案時過去一年精神科住院次數</span>
+      </div>
+      <div class="hospital-his-formula">
+        <b>已結案後個案身心科門診治療成效</b>
+        <span>結案後身心科門診使用次數 − 收案／開案時過去一年精神科門診次數</span>
+      </div>
+      <div class="hospital-his-formula">
+        <b>已結案後個案居家照護科門診治療成效</b>
+        <span>結案後居家照護科門診使用次數 − 收案／開案時過去一年精神科門診次數</span>
+      </div>
+    </div>
+  </div>
+</dialog>
+
 
 <style>
 /* ===== Efficiency V50 refinement ===== */
@@ -13893,9 +15403,27 @@ document.addEventListener('DOMContentLoaded', () => {
       '緊醫出勤準備時間':'醫療實際出勤時間（「出勤單」中填寫的出勤年、月、日、時間），減掉「系統」上首次完成「受理方式」表單的時間。',
       '緊醫電話受理總反應時間':'受理方式為「電話諮詢」的案件：「系統」首次完成「受理方式」表單的時間，減掉「系統」網絡通報完成時間（＝通報後派案時間＋首次專業評估時間，不含出勤準備）。',
       '緊醫出勤總反應時間':'醫療實際出勤時間（「出勤單」中填寫的出勤年、月、日、時間），減掉「系統」網絡通報完成時間。',
-      '高風險個案處理時間(平均)':'緊醫高風險個案完成受理時間 - 高風險個案通報時間。',
-      '中風險個案處理時間(平均)':'緊醫中風險個案完成受理時間 - 中風險個案通報時間。',
-      '低風險個案處理時間(平均)':'緊醫低風險個案完成受理時間 - 低風險個案通報時間。'
+      '衛生局醫療轉介率':'轉介醫療機構案件數（即衛生局優化計畫回覆單中勾選「轉介三總北投」或「轉介松德院區」的案件數） / 衛生局完成回覆單案件數。',
+      '衛生局轉介本院率':'轉介三總北投案件數（即衛生局優化計畫回覆單中勾選「轉介三總北投」的案件數） / 衛生局完成回覆單案件數。',
+      '本院醫療轉介占率':'轉介三總北投案件數（即衛生局優化計畫回覆單中勾選「轉介三總北投」的案件數） / 衛生局轉介醫療機構案件數（轉介三總北投＋轉介松德院區）。',
+      '衛生局暫不轉介率':'暫不轉介案件數（衛生局優化計畫回覆單勾選「暫不轉介」） / 衛生局完成回覆單案件數。',
+      '暫不轉介原因分布':'各暫不轉介原因案件數 / 衛生局暫不轉介案件數。原因包含：社區心衛中心個管服務對象、已住院/門診/居家治療、另行收案、非衛生機關之服務項目、不符合轉介目的、拒訪、資料不足、其他原因。',
+      '衛生局訪視時間':'衛生局填寫在優化計畫「回覆單」中的「訪視日期」，減掉「系統」網絡完成通報時間。',
+      '衛生局分流決策時間':'衛生局填寫在優化計畫「回覆單」中的「派案日期」，減掉「系統」網絡完成通報時間。',
+      '衛生局回覆通報時間':'「系統」衛生局完成優化計畫「回覆單」時間，減掉「系統」網絡完成通報時間。',
+      '衛生局轉介案件開案率':'開案件數 / 衛生局轉介三總北投總案件數。',
+      '暫不轉介覆核同意率':'本院填寫「不轉介覆核單」的「同意」案件數 / 衛生局不轉介案件數。',
+      '暫不轉介覆核駁回率':'本院填寫「不轉介覆核單」的「駁回」案件數 / 衛生局不轉介案件數。',
+      '暫不轉介案件醫療介入率':'衛生局不轉介醫療機構但本院開案件數 / 衛生局不轉介案件數。',
+      '暫不轉介案件覆核時間':'「系統」本院完成不轉介覆核單時間，減掉「系統」衛生局完成優化計畫回覆單時間。',
+      '轉介案件派案時間':'「系統」完成醫師／護理師指派時間，減掉「系統」衛生局完成優化計畫回覆單時間。',
+      '轉介案件首次聯繫時間':'「系統」第一份評估訪視紀錄單的填寫時間，減掉「系統」轉介單的填寫時間。第一～三類都算。',
+      '派案後首次聯繫時間':'「系統」第一份評估訪視紀錄單的填寫時間，減掉「系統」完成醫師／護理師指派時間。第一～三類都算。',
+      '首次專業評估時間':'醫療填寫在評估階段訪視紀錄單中的「訪視日期時間-開始」，減掉「系統」完成醫師／護理師指派時間。',
+      '回覆衛生局時間':'「系統」醫療完成「醫療機構回覆單」的時間，減掉「系統」完成「指派醫師/護理師」的時間。',
+      '高風險個案處理時間(平均)':'緊醫高風險個案完成受理 OR 優化計畫完成首次訪視時間 - 高風險個案通報時間。',
+      '中風險個案處理時間(平均)':'緊醫中風險個案完成受理 OR 優化計畫完成首次訪視時間 - 中風險個案通報時間。',
+      '低風險個案處理時間(平均)':'緊醫低風險個案完成受理 OR 優化計畫完成首次訪視時間 - 低風險個案通報時間。'
     };
 
     const tabBar=document.getElementById('effV79Tabs');
@@ -13904,7 +15432,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const dialogTitle=document.getElementById('effV79DialogTitle');
     const dialogDefinition=document.getElementById('effV79DialogDefinition');
 
+    /* qa：數字、日期與類別篩選改由檔尾 qa-data 模組處理（原本的模擬值、日期倍率已移除），這裡只留子頁籤與指標說明 dialog */
     let activeView='overview';
+
     function showView(view){
       const targetBtn=tabBar?.querySelector(`[data-eff-view="${view}"]`);
       if(!targetBtn || targetBtn.hidden) view='overview';
@@ -17698,9 +19228,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <style id="v73-hospital-snq-filters-layout">
 /* ===== v73: hospital + SNQ share the canonical filter system ===== */
-/* real-data：主選單只剩 5 頁，≥900px 一列排滿（原為 ≥1200px 9 欄） */
-@media(min-width:900px){
-  .tabs{grid-template-columns:repeat(5,1fr) !important;}
+@media(min-width:1200px){
+  .tabs{grid-template-columns:repeat(9,1fr) !important;}
 }
 
 #hospital > .page-time-filter,
@@ -18808,7 +20337,8 @@ img{ max-width:100%; height:auto; }
 #efficiency .eff-v86-bureau-rate-4 article:nth-child(4)>strong{ color:#d97945; }
 
 /* 定義待確認的標記：CSV 對此指標註記「分母應該是所有轉介案，
-   不然轉介率照上面的公式算出來會是 100%」 */
+   不然轉介率照上面的公式算出來會是 100%」
+   V9 追加：客戶確認分母為已完成回覆單，衛生局醫療轉介率卡片已拿掉標記；樣式保留，之後有待確認的指標可再用 */
 #efficiency .eff-v86-flagged{ border-color:#f0d9a8 !important; }
 /* 內嵌在說明文字行內，不額外增加卡片高度——
    這一列的高度預算已經是滿的，多 16px 就會把下方區塊擠出面板 */
@@ -20943,8 +22473,321 @@ html body #outcomeDetailDialog #outcomeStatusFilter .outcome-status-btn{
 }
 </style>
 
-<style id="real-data">
-/* real-data：資料載入完成前先把各頁藏起來（HTML 裡還留著原型的佔位數字，不能讓人看到） */
+
+<style id="v8-platform-usage">
+/* =========================================================================
+   v8 — 指揮儀表板新增「平台使用率」子頁籤（#commandUsageView）
+   -------------------------------------------------------------------------
+   版面直接套用「結案率」的 closure-v74 樣式：舊層幾乎都以 class 寫成
+   `#command .closure-v74-…`，新頁籤自動吃到同一套字級與各尺寸的排版。
+   這裡只補兩件事：
+     1) 舊層以 #commandClosureView 指名的檢視容器規則（display／高度），比照補上
+     2) 清單列數：結案率固定 4 列（各層都寫死 repeat(4,…)），這裡是 8 個單位，
+        ≥1200px 改為 --usage-rows 列平分高度，≤1199px 改為依內容撐高
+   權重以 `html body .dashboard #command #commandUsageView` 起頭 (2,2,2)，
+   壓過舊層最高的 `#command .closure-v74-list{…!important}` (1,1,0)。
+   ========================================================================= */
+html body .dashboard #command #commandUsageView.active{ display:block !important; min-height:0 !important; }
+@media (min-width:1200px){
+  html body .dashboard #command #commandUsageView.active{ height:100% !important; overflow:hidden !important; }
+  html body .dashboard #command #commandUsageView .closure-v74-list{
+    grid-template-rows:repeat(var(--usage-rows,8),minmax(0,1fr)) !important;
+  }
+}
+@media (max-width:1199px){
+  html body .dashboard #command #commandUsageView.active{ height:auto !important; overflow:visible !important; }
+  html body .dashboard #command #commandUsageView .closure-v74-list{
+    grid-template-rows:none !important;
+    grid-auto-rows:auto !important;
+  }
+}
+/* ≤899px：v84 把每列收成單欄（名稱／長條／百分比各佔一行），8 列太長；
+   改為第一行「單位＋未曾登入｜使用率」、第二行長條＋帳號數 */
+@media (max-width:899px){
+  html body .dashboard #command #commandUsageView .closure-v74-row{
+    grid-template-columns:minmax(0,1fr) auto !important;
+    grid-template-rows:auto auto !important;
+    grid-template-areas:"name rate" "bar bar";
+    row-gap:6px !important;
+  }
+  html body .dashboard #command #commandUsageView .closure-v74-year{
+    grid-area:name; flex-direction:row; align-items:baseline; gap:8px;
+  }
+  html body .dashboard #command #commandUsageView .closure-v74-bar-area{ grid-area:bar; }
+  html body .dashboard #command #commandUsageView .closure-v74-rate{ grid-area:rate; }
+}
+
+/* 圓環中間的數字：舊層的圓環寬度跟視窗高度（vh）走、數字字級跟視窗寬度（vw）走，
+   ≥1200px 時數字會比圓環中間的白色區（寬 64%）還寬（v7 結案率就如此）。
+   改為字級依圓環本身的寬度（container query 的 cqi）：19cqi 時最長的「100.0%」約為圓環寬的 55%。
+   結案率與平台使用率共用 */
+html body .dashboard #command .closure-v74-donut{ container-type:inline-size; }
+html body .dashboard #command .closure-v74-donut .closure-v74-donut-center strong{ font-size:19cqi !important; }
+</style>
+
+
+<!-- qa：原 <script id="v8-platform-usage-behavior">（模擬資料）已移除，改由檔尾 qa-data 模組依資料繪製 -->
+
+<style id="v9-hospital-indicators">
+/* =========================================================================
+   v9 — 醫療機構端處理成效分析：依客戶「V9 調整」重整指標
+   -------------------------------------------------------------------------
+   #hospitalSplitLayout 改成兩區（HTML 在 #hospital 內，數字由 v9-hospital-indicators-behavior 填）：
+     #hospitalOptPanel     優化計畫專屬指標：六張卡，選「緊急醫療」時整區隱藏
+     #hospitalSharedPanel  共同指標：三張卡＋說明卡，緊急醫療＋優化計畫，數字依通報類別切換
+   ≥1200px：左右並排 3fr｜2fr，兩區各兩列，卡片寬度大致相同（頁面在這個範圍高度鎖在視窗內，最多只放得下兩列）；
+            選「緊急醫療」時共同指標撐滿整列：三張卡一列、說明卡收成下方一條，區塊高度依內容、不硬撐滿。
+   900–1199px：上下排，專屬三欄、共同兩欄，高度依內容。
+   ≤899px：v84 已把 .hospital-split-layout／.hospital-his-grid-right 收成單欄，這裡不另外處理。
+   權重：舊層最高到 (2,5,0)（v5 的 .hospital-his-grid-right:has(#hospitalUnableCard[hidden])），
+   本層以 `html body .dashboard #hospital.page` 起頭，版面規則再接 #hospitalSplitLayout 與 v9 class。
+   ========================================================================= */
+html body .dashboard #hospital.page #hospitalSplitLayout > .v9-hospital-panel[hidden]{ display:none !important; }
+
+/* 區塊標題下的一行說明 */
+html body .dashboard #hospital.page #hospitalSplitLayout .v9-hospital-panel .hospital-his-head p{
+  margin:2px 0 0 !important;
+  color:#8793a3 !important;
+  font-size:12px !important;
+  line-height:1.3 !important;
+}
+
+/* ---------- ≥1200px：左右並排 ---------- */
+@media (min-width:1200px){
+  /* 1.41：1 而不是 3：2：讓共同指標最長的標題（17 字）與專屬區的「每月使用門診次數變化」（16 字）在 1536 寬都排得下一行，
+     否則卡片多一行、兩列撐高，頁面要多捲一段 */
+  html body .dashboard #hospital.page #hospitalSplitLayout.v9-hospital-layout{
+    grid-template-columns:minmax(0,1.41fr) minmax(0,1fr) !important;
+    gap:12px !important;
+  }
+  html body .dashboard #hospital.page #hospitalSplitLayout .v9-hospital-panel .hospital-his-card{
+    padding-left:12px !important;
+    padding-right:12px !important;
+  }
+  /* v5 讓每個區塊跨整列，這裡改回各佔一欄 */
+  html body .dashboard #hospital.page #hospitalSplitLayout.v9-hospital-layout > .v9-hospital-panel{
+    grid-column:auto !important;
+    min-width:0 !important;
+  }
+  html body .dashboard #hospital.page #hospitalSplitLayout .v9-hospital-opt .v9-hospital-grid.hospital-his-grid-right{
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    grid-template-rows:repeat(2,minmax(0,1fr)) !important;
+  }
+  html body .dashboard #hospital.page #hospitalSplitLayout .v9-hospital-shared .v9-hospital-grid.hospital-his-grid-right{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    grid-template-rows:repeat(2,minmax(0,1fr)) !important;
+  }
+  html body .dashboard #hospital.page #hospitalSplitLayout .v9-hospital-panel .hospital-his-head p{ font-size:var(--v5-t2) !important; }
+
+  /* 選「緊急醫療」：只剩共同指標 */
+  html body .dashboard #hospital.page #hospitalSplitLayout.v9-hospital-layout.v9-emergency{
+    grid-template-columns:minmax(0,1fr) !important;
+  }
+  html body .dashboard #hospital.page #hospitalSplitLayout.v9-emergency > .v9-hospital-shared{
+    align-self:start !important;
+    height:auto !important;
+  }
+  html body .dashboard #hospital.page #hospitalSplitLayout.v9-emergency .v9-hospital-shared .v9-hospital-grid.hospital-his-grid-right{
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    grid-template-rows:auto auto !important;
+    height:auto !important;
+  }
+  html body .dashboard #hospital.page #hospitalSplitLayout.v9-emergency .v9-scope-card{
+    grid-column:1 / -1 !important;
+    flex-direction:row !important;
+    flex-wrap:wrap !important;
+    align-items:center !important;
+    column-gap:16px !important;
+    row-gap:6px !important;
+  }
+  html body .dashboard #hospital.page #hospitalSplitLayout.v9-emergency .v9-scope-card p{ margin:0 !important; flex:1 1 360px; }
+  html body .dashboard #hospital.page #hospitalSplitLayout.v9-emergency .v9-scope-card .hospital-his-info-btn{ margin-top:0 !important; }
+}
+
+/* 1366 寬（標題字級約 13.7px）時，兩個最長的標題只差 1–2px 就排得下一行，左右留白再收 2px */
+@media (min-width:1200px) and (max-width:1439px){
+  html body .dashboard #hospital.page #hospitalSplitLayout .v9-hospital-panel .hospital-his-card{
+    padding-left:10px !important;
+    padding-right:10px !important;
+  }
+}
+
+/* ---------- 900–1199px：上下排 ---------- */
+@media (min-width:900px) and (max-width:1199px){
+  html body .dashboard #hospital.page #hospitalSplitLayout.v9-hospital-layout{
+    grid-template-columns:minmax(0,1fr) !important;
+    gap:12px !important;
+  }
+  /* 舊層在 ≤1100px 給 .hospital-his-right 最小高 650px，兩列卡片撐不滿 */
+  html body .dashboard #hospital.page #hospitalSplitLayout .v9-hospital-panel{
+    height:auto !important;
+    min-height:0 !important;
+  }
+  html body .dashboard #hospital.page #hospitalSplitLayout .v9-hospital-opt .v9-hospital-grid.hospital-his-grid-right{
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    grid-template-rows:auto !important;
+  }
+  html body .dashboard #hospital.page #hospitalSplitLayout .v9-hospital-shared .v9-hospital-grid.hospital-his-grid-right{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    grid-template-rows:auto !important;
+  }
+}
+
+/* ---------- 卡片內容 ---------- */
+/* 失聯率、拒訪率：不希望發生的事，用橘色 */
+html body .dashboard #hospital.page .hospital-his-card.v9-alert > strong{ color:#e5764e !important; }
+html body .dashboard #hospital.page .hospital-his-card.v9-alert .hospital-his-bar i{ background:#e5764e !important; }
+
+/* 次數變化：good（沿用舊層綠色）／v9-bad 橘色／v9-neutral 藍色（只描述增減、不判斷好壞） */
+html body .dashboard #hospital.page .hospital-his-card.delta.v9-bad > strong{ color:#e5764e !important; }
+html body .dashboard #hospital.page .hospital-his-card.delta.v9-bad .hospital-his-trend{ color:#d1603a !important; }
+html body .dashboard #hospital.page .hospital-his-card.delta.v9-neutral > strong{ color:#218fee !important; }
+html body .dashboard #hospital.page .hospital-his-card.delta.v9-neutral .hospital-his-trend{ color:#526071 !important; }
+
+/* 轉介率的四個選項：數字是該項人數 ÷ 收案總人數。
+   V9 追加改成正式名稱後最長 8 個字（社區心理衛生中心），原本的兩欄小格在 1200–1920px 都會被截斷 → 一列一項，不畫進度條。
+   間距：每列上下留 2px、列與列隔 4px（原本 0／1px 太擠）。
+   頁面高度依內容的尺寸（1536×864／730、1366×657、平板、手機）這張卡是整列最高的，會把兩列卡片一起撐高，1536 寬整頁約多 50px；
+   1920×1080 這類鎖高的尺寸卡片下方有空白，清單往下撐、每列放大到 2.2em 為止 */
+html body .dashboard #hospital.page .v9-referral-card .hospital-his-bar{ display:none !important; }
+html body .dashboard #hospital.page .v9-referral-split{
+  list-style:none;
+  flex:1 0 auto;
+  margin:4px 0 0;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+html body .dashboard #hospital.page .v9-referral-split li{
+  flex:1 0 auto;
+  max-height:2.2em;
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin:0;
+  padding:2px 8px;
+  border-radius:4px;
+  background:#eef5fd;
+  color:#526071;
+  font-size:12px;
+  line-height:1.24;
+}
+html body .dashboard #hospital.page .v9-referral-split li span{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+html body .dashboard #hospital.page .v9-referral-split li b{ color:#1f7fd6; font-weight:700; white-space:nowrap; }
+
+/* 每月次數變化的數線（−3～+3，中線為 0），兩端標刻度；點的顏色跟著卡片的好壞 */
+html body .dashboard #hospital.page .v9-axis-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:10px;
+  color:#98a2b3;
+  font-size:10.5px;
+  line-height:1;
+}
+html body .dashboard #hospital.page .v9-axis{
+  position:relative;
+  flex:1 1 auto;
+  height:6px;
+  border-radius:999px;
+  background:#e8eef5;
+  color:#2f9d69;
+}
+html body .dashboard #hospital.page .v9-neutral .v9-axis{ color:#218fee; }
+html body .dashboard #hospital.page .v9-bad .v9-axis{ color:#e5764e; }
+html body .dashboard #hospital.page .v9-axis::before{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:-4px;
+  bottom:-4px;
+  width:2px;
+  margin-left:-1px;
+  border-radius:1px;
+  background:#b8c4d3;
+}
+html body .dashboard #hospital.page .v9-axis i{
+  position:absolute;
+  top:50%;
+  width:12px;
+  height:12px;
+  margin:-6px 0 0 -6px;
+  border-radius:50%;
+  background:currentColor;
+  box-shadow:0 0 0 2px #fff,0 1px 3px rgba(16,24,40,.25);
+  transition:left .2s ease;
+}
+
+/* 說明卡：虛線外框，與指標卡區分 */
+html body .dashboard #hospital.page .hospital-his-card.v9-scope-card{
+  background:#f7f9fc;
+  border-style:dashed;
+  border-color:#d5dde8;
+}
+html body .dashboard #hospital.page .v9-scope-card p{
+  margin:6px 0 0;
+  color:#667085;
+  font-size:12px;
+  line-height:1.6;
+}
+html body .dashboard #hospital.page .v9-scope-card .hospital-his-info-btn{
+  margin-top:auto !important;
+  align-self:flex-start;
+  height:auto !important;
+  min-height:32px !important;
+  padding:6px 12px !important;
+  border:1px solid #b9d8f5 !important;
+  border-radius:7px !important;
+  background:#fff !important;
+  color:#1f7fd6 !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  line-height:1.3 !important;
+  white-space:normal !important;
+  text-align:left !important;
+}
+html body .dashboard #hospital.page .v9-scope-card .hospital-his-info-btn:hover{ background:#e7f2fe !important; border-color:#9fcaf1 !important; }
+
+@media (min-width:1200px){
+  html body .dashboard #hospital.page .v9-referral-split li,
+  html body .dashboard #hospital.page .v9-scope-card p{ font-size:var(--v5-t2) !important; }
+  html body .dashboard #hospital.page .v9-axis-row{ font-size:var(--v5-t1) !important; }
+  html body .dashboard #hospital.page .v9-scope-card .hospital-his-info-btn{ font-size:var(--v5-t3) !important; }
+}
+
+/* ---------- 指標計算說明 dialog：分組標題 ---------- */
+#hospitalHisDialog .v9-formula-group{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:baseline;
+  gap:4px 10px;
+  margin:20px 0 2px;
+  padding:9px 12px;
+  border-radius:8px;
+  background:#f1f6fc;
+  color:#1f4f82;
+  font-size:16px;
+  font-weight:800;
+  line-height:1.4;
+}
+#hospitalHisDialog .v9-formula-group:first-child{ margin-top:4px; }
+#hospitalHisDialog .v9-formula-group span{ color:#667085; font-size:13.5px; font-weight:500; }
+@media (max-width:900px){
+  #hospitalHisDialog .v9-formula-group{ font-size:14.5px; }
+  #hospitalHisDialog .v9-formula-group span{ font-size:12.5px; }
+}
+</style>
+
+<!-- qa：原 <script id="v9-hospital-indicators-behavior">（模擬資料）已移除，改由檔尾 qa-data 模組依資料繪製 -->
+
+<style id="qa-data">
+/* =========================================================================
+   qa-data：qa 版的資料層樣式（狀態列、載入前隱藏、尚無資料、沿用 prod 的版面修正）
+   ========================================================================= */
+/* 資料載入完成前先把各頁藏起來（HTML 裡還留著原型的佔位數字，不能讓人看到） */
 html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
 
 .rd-status{
@@ -20952,22 +22795,15 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
   margin:4px 0 2px; font-size:12px; line-height:1.5; color:#667085;
 }
 .rd-status b{ color:#344054; font-weight:600; }
-.rd-status .rd-sample{
-  padding:1px 8px; border-radius:999px; background:#fff4d6; color:#8a5a00; font-weight:700;
-}
+.rd-status .rd-sample{ padding:1px 8px; border-radius:999px; background:#fff4d6; color:#8a5a00; font-weight:700; }
 .rd-status .rd-warn{ color:#b54708; }
 .rd-status.rd-error{
   justify-content:flex-start; padding:10px 14px; border:1px solid #f4c7c0; border-radius:8px;
   background:#fff4f2; color:#b42318; font-size:13px;
 }
-.rd-pick{
-  display:inline-flex; align-items:center; padding:4px 12px; border-radius:6px; cursor:pointer;
-  background:#218fee; color:#fff; font-weight:600;
-}
+.rd-pick{ display:inline-flex; align-items:center; padding:4px 12px; border-radius:6px; cursor:pointer; background:#218fee; color:#fff; font-weight:600; }
 .rd-pick input{ display:none; }
-/* ≥900px：狀態列疊在頁首右下角，不佔版面高度。舊層在 ≥1500px 把 .dashboard 鎖成視窗高度並 overflow:hidden，
-   狀態列多佔的 22px 會把各頁底部擠出畫面、又捲不到（v7 沒有這一列）。
-   不設 top 時絕對定位留在原本的位置（緊接頁首之後），再往上移自身高度＋4px 貼齊頁首底邊；寬度限制在標題右側的空白內，過長時往上換行。
+/* ≥900px：狀態列疊在頁首右下角，不佔版面高度（≥1500px 舊層把 .dashboard 鎖成視窗高度，多一列會把各頁底部擠出畫面）。
    錯誤狀態（含選檔按鈕）維持在原位，那時各頁是隱藏的，不影響版面 */
 @media (min-width:900px){
   .dashboard{ position:relative; }
@@ -20976,6 +22812,14 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
     transform:translateY(calc(-100% - 4px));
   }
 }
+
+/* AI模型預測準確率、醫院內控指標(SNQ) 先隱藏：主選單少兩顆，≥1200px 由 9 欄改 7 欄（900–1199px 原本就是 4 欄兩列，第二列剩 3 顆）。
+   恢復其中一頁時欄數加 1 */
+@media (min-width:1200px){
+  .tabs{ grid-template-columns:repeat(7,1fr) !important; }
+}
+.dashboard #ai.page[hidden],
+.dashboard #snq.page[hidden]{ display:none !important; }
 
 /* 風險頁：某量表在區間內沒有任何初評資料 */
 #risk .risk-stack.rd-empty{ align-items:center; justify-content:center; }
@@ -20986,20 +22830,31 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
 #districtMapDialog .geo-rank-bar.risk>i.none{ background:#c3cad4 !important; }
 #districtMapDialog .geo-tip-risk.none{ color:#667085; }
 
-/* 通報類別篩選只剩一顆鈕；舊層在 ≤680px 把 #reporterTypeFilter 鎖成三等分，單顆鈕只佔 1/3，改成撐滿（與風險頁一致） */
-@media (max-width:899px){
-  html body .dashboard #reporter.page #reporterTypeFilter{ grid-template-columns:minmax(0,1fr) !important; }
-}
+/* 表格裡的「此區間沒有資料」 */
+.qa-empty-cell{ padding:18px 8px !important; color:#98a2b3 !important; text-align:center !important; }
 
-/* 通報者頁直條圖：數值標在長條上方約 20px，圖區頂端又緊貼軸標題，長條滿格（回收率 100%、5.0 分、件數等於刻度上限）時數值會壓到標題；
-   在圖區上方預留標籤高度，軸刻度與長條一起下移、仍對齊（≤899px 改橫條，不受影響） */
+/* 通報者頁直條圖：數值標在長條上方，長條滿格時會壓到軸標題；圖區上方預留標籤高度（prod 的修正，v8／v9 原型沒有） */
 @media (min-width:900px){
   html body .dashboard #reporter.page .reporter-bar-chart{ padding-top:24px !important; }
 }
 
-/* 效率頁處理流程：箭頭線上方的數字（top:-33px、行高 normal）與「小時」（top:-12px）互相重疊，「小時」底邊還壓在 4px 的箭頭線上（v7 原型就如此）；
-   兩者改行高 1 並各自上移，「小時」與箭頭線留 2px。
-   ≤760px 是直式流程（數字在 4px 寬的直線右側），「小時」的定位框只有 4px 寬會被擠成兩行、壓到數字，改為不換行並排在數字正下方 */
+/* 通報者頁：真實資料是七大網絡＋「其他」共 8 個單位（原型只有 7 個）。
+   ≥1200px 圓餅圖右側的圖例單欄排 8 列會比卡片高，撐高整列、連圓餅底部的百分比都被切掉 → 8 項以上改兩欄。
+   900–1199px 長條圖的間距與最小寬度是照 7 根設計的，第 8 根會被切掉 → 縮小間距與最小寬度 */
+@media (min-width:1200px){
+  html body .dashboard #reporter.page .reporter-legend:has(> .reporter-legend-item:nth-child(8)){
+    display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 8px !important; align-content:center;
+  }
+  html body .dashboard #reporter.page .reporter-legend:has(> .reporter-legend-item:nth-child(8)) .reporter-legend-item span{
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+}
+@media (min-width:900px) and (max-width:1199px){
+  html body .dashboard #reporter.page .reporter-bars-area{ gap:clamp(6px,.9vw,14px) !important; padding-left:10px !important; padding-right:10px !important; }
+  html body .dashboard #reporter.page .reporter-bar-col{ min-width:30px !important; }
+}
+
+/* 效率頁處理流程：箭頭線上方的數字與「小時」互相重疊（prod 的修正，v8／v9 原型沒有） */
 @media (min-width:761px){
   html body .dashboard #efficiency .eff-v79-flow-seg strong{ top:-36px; line-height:1; }
   html body .dashboard #efficiency .eff-v79-flow-seg>span{ top:-14px; line-height:1; }
@@ -21009,79 +22864,197 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
   html body .dashboard #efficiency .eff-v79-flow-seg>span{ top:24px; line-height:1; white-space:nowrap; }
 }
 
-/* 指揮板「年度結案率」圓環：舊層的圓環寬度跟視窗高度（vh）走、中間數字字級跟視窗寬度（vw）走，≥1200px 時數字比圓環中間的白色區（寬 64%）還寬（v7 原型就如此）。
-   改為字級依圓環本身的寬度（container query 的 cqi）：19cqi 時最長的「100.0%」約為圓環寬的 55%，放得進白色區 */
-html body .dashboard #command .closure-v74-donut{ container-type:inline-size; }
-html body .dashboard #command .closure-v74-donut .closure-v74-donut-center strong{ font-size:19cqi !important; }
+/* 指揮儀表板同期比較：比較期間整段早於平台起始日 2026/10/05 的年份（欄位保留、數字「—」） */
+#command .cmp-table thead th.cmp-disabled,
+#command .cmp-table thead th.cmp-disabled small{ color:#b4bcc7; }
+#command .cmp-table .cmp-val.cmp-disabled{ background:#f8f9fb; }
+
+/* SNQ／平台使用率：data-platform.json 沒有載入時的說明 */
+.qa-platform-missing{ margin:8px 0 0; color:#98a2b3; font-size:12px; }
+
+/* 效率頁「優化計畫衛生局處置效率」（v9 原型就有的問題）：≥1200px 面板鎖在視窗高度內，下方「暫不轉介原因分布／衛生局處理時間」
+   只吃剩餘高度（舊層 min-height:0），視窗矮於約 834px 就被壓扁：1536×730 原因表只露出 1 列、處理時間第 3 項被切，1366×657 整列幾乎看不到。
+   → 下方至少 236px（處理時間三項放得下、原因表露出 4 列，其餘在表格內捲動）；放不下時整個面板內捲動，不再裁切。
+   1536×864 以上剩餘高度本來就超過 236px，版面不變 */
+@media (min-width:1200px){
+  html body .dashboard #efficiency.page.active [data-eff-panel="bureau"]:not([hidden]){ overflow-y:auto !important; }
+  html body .dashboard #efficiency.page.active [data-eff-panel="bureau"] .eff-v83-bureau-bottom{ flex:1 1 0 !important; min-height:236px !important; }
+}
+
+/* 成效頁「改善情況」卡片（v9 原型就有的問題）：≥1200px 卡片高度約＝(視窗高 − 324px) ÷ 2，
+   視窗矮於約 800px（1536×730、1366×657、1280×720…）時，直式排列（圓環在上、改善／持平／變差在下）的圓環
+   會蓋住「持平」，再矮一點連圓環中心的百分比也被切掉。
+   → 卡片內容高度不到 230px（直式約 220px 以下開始重疊，留 10px 餘裕）時改橫式：圓環在左、三項數字在右直排。
+   卡片是 size container（outcome-card），container query 只能改卡片「裡面」的元素，所以卡片格線先在 ≥1200px
+   一律改兩欄（第 2 欄 auto）：直式時三個子元素都橫跨兩欄，第 2 欄寬 0，版面跟原本一樣；橫式時才把圓環、數字分到兩欄。
+   橫式的圓環按鈕自己也是 size container，圓環大小與中心字級依它的寬高計算（cqw／cqh 改以按鈕為準） */
+@media (min-width:1200px){
+  html body .dashboard #outcome.page.active .outcome-card{ grid-template-columns:minmax(0,1fr) auto !important; }
+  html body .dashboard #outcome.page.active .outcome-card > .outcome-card-head{ grid-column:1 / -1 !important; grid-row:1 !important; }
+  html body .dashboard #outcome.page.active .outcome-card > .outcome-donut-btn{ grid-column:1 / -1 !important; grid-row:2 !important; }
+  html body .dashboard #outcome.page.active .outcome-card > .outcome-breakdown{ grid-column:1 / -1 !important; grid-row:3 !important; }
+
+  @container outcome-card (max-height:229.98px){
+    html body .dashboard #outcome.page.active .outcome-card > .outcome-card-head{ padding:7px 10px !important; }
+    html body .dashboard #outcome.page.active .outcome-card > .outcome-donut-btn{
+      grid-column:1 !important; grid-row:2 / 4 !important;
+      container-type:size !important; container-name:outcome-donut !important;
+    }
+    html body .dashboard #outcome.page.active .outcome-card > .outcome-breakdown{
+      grid-column:2 !important; grid-row:2 / 4 !important;
+      align-self:center !important;
+      grid-template-columns:minmax(0,1fr) !important;
+      gap:0 !important;
+      min-width:104px !important;
+    }
+    html body .dashboard #outcome.page.active .outcome-breakdown > div{
+      display:flex !important; align-items:baseline !important; justify-content:space-between !important; gap:10px !important;
+      padding:5px 0 !important; text-align:left !important;
+    }
+    html body .dashboard #outcome.page.active .outcome-breakdown > div:first-child{ border-top:0 !important; }
+    html body .dashboard #outcome.page.active .outcome-breakdown > div > strong{ margin-top:0 !important; }
+    html body .dashboard #outcome.page.active .outcome-donut{
+      --donut-size:min(100cqw, 96cqh, 150px);
+      width:var(--donut-size) !important; height:var(--donut-size) !important;
+    }
+    html body .dashboard #outcome.page.active .outcome-center{ padding:0 3% !important; }
+    html body .dashboard #outcome.page.active .outcome-avg{
+      font-size:clamp(15px, calc(min(100cqw, 96cqh, 150px) * .16), 24px) !important;
+    }
+    html body .dashboard #outcome.page.active .outcome-center span{
+      margin-top:2px !important;
+      font-size:clamp(9px, calc(min(100cqw, 96cqh, 150px) * .095), 12px) !important;
+      line-height:1.15 !important;
+    }
+  }
+}
 </style>
 
-<script id="real-data">
+<script id="qa-data">
 /* =========================================================================
-   real-data：畫面上的數字全部由同資料夾的 data.json 計算，取代原型的模擬資料
+   qa-data：qa 版所有數字的來源
    -------------------------------------------------------------------------
-   data.json 由排程主機定期產生並 push，格式（欄位、代碼、時間）以 prod/DATA_CONTRACT.md 為準。重點：
-   ・最外層是 {"schemaVersion":1, "updatedAt":…, "emg":[...]}，一筆緊急醫療通報一個物件；本檔只保留緊急醫療，其他鍵（之後的優化計畫）不讀
-   ・schemaVersion 不是 SCHEMA_VERSION 時不畫任何數字、直接顯示錯誤（欄位意義可能變了，寧可不畫也不要算錯）；沒有這個鍵視為 1（舊檔）
-   ・允許行註解（//）、區塊註解與結尾多餘的逗號；最外層有 "sample": true 時頁首標示「範例資料」
-   ・"updatedAt"（排程撈資料的時間）顯示在頁首，距今超過 STALE_AFTER_HOURS 小時另外提示「資料已 N 天未更新」；
-     "asOf"（本日／本月…的基準日）省略時取 updatedAt 的臺北日期，再沒有就取最晚一筆通報的日期；
-     "dataStart"（資料起日）省略時取最早一筆通報的日期
-   ・所有日期篩選都以 timePoint.reportedAt（網絡完成通報時間）為準，以臺北時間切日
-   ・以 file:// 開啟時瀏覽器不允許網頁讀取 JSON，頁首改為「選擇 data.json」
-   地圖模組（主腳本的 geoCases()）透過 window.RD.basicCases() 取基本資料頁目前區間的案件。
+   ・data.json（schemaVersion 2）：緊急醫療 emg[]、優化計畫 opt[]，一筆通報一個物件；
+     格式以同資料夾 data.template.jsonc 與 DATA_CONTRACT.md 為準。schemaVersion 1（prod 的舊格式，只有 emg）也讀得懂。
+   ・data-platform.json（schemaVersion 1）：醫院內控指標 snq、平台使用率 usage 的彙總數字，與 AI 頁的預測比對 ai.predictions；
+     這個檔載入失敗只影響那三處，頁首提示，其他頁照常。
+     ★ 目前三處都隱藏：SNQ 與平台使用率 SHOW_PLATFORM=false（使用者 2026-11-11 指示）、AI 頁 SHOW_AI=false（2026-11-09）。
+       兩個都是 false 就不讀這個檔，頁首也不顯示它的提示與範例標籤；renderSnq()／renderUsage()／renderAiScatter() 照常執行（畫成「尚無資料」）。
+       恢復時把對應的改成 true，並還原主選單與子頁籤的按鈕。
+   ・normalizeCase() 把兩種通報轉成同一種案件物件，各頁 render*() 只讀案件物件。
+     data.json 改欄位名或代碼時，只改 normalizeCase() 與下面的代碼表。
+   ・日期篩選一律以通報時間（timePoint.reportedAt）的臺北日期為準，含頭尾；結案率不受日期篩選影響。
+     平台起始日固定 2026/10/05（PLATFORM_START）：日期最早可選這天，早於這天的通報不列入。
+   ・地圖模組（主腳本 geoCases()）透過 window.RD.basicCases() 取基本資料頁目前區間的案件；
+     AI 頁（目前隱藏）的 buildAiPairs()／getAiHistoryRows() 讀 RD.aiPairs()／RD.aiHistory()（資料來自 data-platform.json，不是 data.json 的通報）。
+   ・指揮儀表板「同期比較」：三年欄位保留，期間整段早於 PLATFORM_START 的年份標示「平台未啟用」（使用者 2026-11-11 決定），見 comparePeriods()。
    ========================================================================= */
 (()=>{
   'use strict';
 
-  const DATA_FILE = 'data.json';
-  /* data.json 的格式版本。改名、刪欄位、改代碼意義時排程與本檔一起加 1；只新增選填欄位不用改 */
-  const SCHEMA_VERSION = 1;
-  /* 排程至少每天跑一次；updatedAt 距今超過這個時數就在頁首提示，避免排程停了沒人發現 */
-  const STALE_AFTER_HOURS = 48;
-  /* reporterDepartment 代碼 → 網絡。
-     ※ 待確認：data.json 只註明「0-7 為七大網絡、8 為其他」，沒有說哪個代碼是哪個網絡；
-       0–6 暫依 db_desc 的 ref_network_unit 順序對應，7 尚未對應（出現時列為「代碼 7（未對應）」） */
-  const DEPARTMENT = { 0:'social', 1:'police', 2:'civil', 3:'health', 4:'education', 5:'fire', 6:'labor', 8:'other' };
-  const NETWORKS = [
-    ['social','社政'],['police','警察'],['civil','民政'],['health','衛政'],
-    ['education','教育'],['fire','消防'],['labor','勞政'],['other','其他']
-  ];
-  const TAIPEI_DISTRICTS = ['松山區','信義區','大安區','中山區','中正區','大同區','萬華區','文山區','南港區','內湖區','士林區','北投區'];
-  /* 縣市全名（與地圖圖資一致，一律用「臺」）。caseInfo.dict 開頭帶縣市時（「新北市板橋區」）用這張表拆開；
-     用整張表比對而不是「前三字以縣市結尾」，因為竹北市、員林市這類縣轄市本身就是行政區 */
-  const COUNTIES = ['臺北市','新北市','桃園市','臺中市','臺南市','高雄市','基隆市','新竹市','嘉義市',
-    '新竹縣','苗栗縣','彰化縣','南投縣','雲林縣','嘉義縣','屏東縣','宜蘭縣','花蓮縣','臺東縣','澎湖縣','金門縣','連江縣'];
-  const AGE_BINS = [[0,10,'0-10'],[10,20,'10-20'],[20,30,'20-30'],[30,40,'30-40'],[40,50,'40-50'],[50,60,'50-60'],[60,70,'60-70'],[70,80,'70-80'],[80,Infinity,'80+']];
-  const LEVELS = ['low','medium','high'];   /* assess 的 0／1／2 */
-  const LEVEL_LABEL = { low:'輕度／低風險', medium:'中度／中風險', high:'重度／高風險' };
-  /* assess 的鍵 → 風險頁 .risk-stack[data-key]；CTRS 是風險檢傷評估 */
-  const SCALE_ROW = { CTRS:'scale', GAF:'gaf', BSRS5:'bsrs', CGIS:'cgi' };
-  const GENDER = { 10:'M', 20:'F' };
-  const ACCEPT_WAY = { 0:'phone', 1:'phone_dispatch' };
-  const HOUR = 3600000;
-  const TAIPEI_OFFSET = 8*HOUR;   /* 臺北時間固定 UTC+8，沒有日光節約 */
+  const DATA_FILE='data.json';
+  const PLATFORM_FILE='data-platform.json';
+  /* data-platform.json 的三個使用處目前都隱藏：醫院內控指標與平台使用率（2026-11-11）、AI模型預測準確率（2026-11-09）。
+     兩個都是 false＝不讀 data-platform.json（檔案不存在也不會有 404 或頁首提示）；任一個 true 就讀 */
+  const SHOW_PLATFORM=false;
+  const SHOW_AI=false;
+  const LOAD_PLATFORM=SHOW_PLATFORM || SHOW_AI;
+  /* 頁首「平台資料未載入」提示裡列出受影響的頁面 */
+  const PLATFORM_PAGES=[...(SHOW_PLATFORM ? ['醫院內控指標','平台使用率'] : []),...(SHOW_AI ? ['AI模型預測準確率'] : [])].join('、');
+  /* 2＝緊急醫療＋優化計畫；1＝prod 的舊格式（只有 emg），讀得懂，方便拿正式資料對照 */
+  const SCHEMA_VERSIONS=[1,2];
+  const PLATFORM_SCHEMA_VERSION=1;
+  /* 排程至少每天跑一次；updatedAt 距今超過這個時數就在頁首提示 */
+  const STALE_AFTER_HOURS=48;
+  /* 平台起始日（固定，V9 追加）：日期欄位最早可選、快速鈕與指揮板預設區間的起點、年度結案率從這一年列起。
+     早於這天的通報不列入任何頁面（頁首提示件數）。data.json 不用、也不讀 dataStart */
+  const PLATFORM_START='2026-10-05';
 
-  const RD = window.RD = {
-    loaded:false,
-    cases:[], updatedAt:null, updatedTime:null, updatedHasTime:false, asOf:null, dataStart:null, sample:false,
-    ranges:{},
-    basicCases(){ const r=RD.ranges.basic; return r ? casesIn(r.start,r.end) : []; }
+  /* ---------- 代碼表（★ 待確認的見 DATA_CONTRACT.md） ---------- */
+  /* ★ reporterDepartment：只知道「0-7 為七大網絡、8 為其他」，0–6 暫依舊資料庫規劃的 ref_network_unit 順序，7 未對應 */
+  const DEPARTMENT={ 0:'social', 1:'police', 2:'civil', 3:'health', 4:'education', 5:'fire', 6:'labor', 8:'other' };
+  const NETWORKS=[['social','社政'],['police','警察'],['civil','民政'],['health','衛政'],['education','教育'],['fire','消防'],['labor','勞政'],['other','其他']];
+  const TAIPEI_DISTRICTS=['松山區','信義區','大安區','中山區','中正區','大同區','萬華區','文山區','南港區','內湖區','士林區','北投區'];
+  const COUNTIES=['臺北市','新北市','桃園市','臺中市','臺南市','高雄市','基隆市','新竹市','嘉義市',
+    '新竹縣','苗栗縣','彰化縣','南投縣','雲林縣','嘉義縣','屏東縣','宜蘭縣','花蓮縣','臺東縣','澎湖縣','金門縣','連江縣'];
+  const AGE_BINS=[[0,10,'0-10'],[10,20,'10-20'],[20,30,'20-30'],[30,40,'30-40'],[40,50,'40-50'],[50,60,'50-60'],[60,70,'60-70'],[70,80,'70-80'],[80,Infinity,'80+']];
+  const LEVELS=['low','medium','high'];   /* assess 的 0／1／2；3（其他）不列入 */
+  const LEVEL_LABEL={ low:'輕度／低風險', medium:'中度／中風險', high:'重度／高風險' };
+  const SCALE_ROW={ CTRS:'scale', GAF:'gaf', BSRS5:'bsrs', CGIS:'cgi' };   /* assess 的鍵 → 風險頁 .risk-stack[data-key] */
+  const SCALES=['CTRS','GAF','BSRS5','CGIS'];
+  const GENDER={ 10:'M', 20:'F' };
+  const ACCEPT_WAY={ 0:'phone', 1:'phone_dispatch' };
+  const OPT_CATEGORY={ 1:'opt1', 2:'opt2', 3:'opt3' };
+  const CATEGORY_LABEL={ emg:'緊急醫療', opt1:'第一類優化計畫', opt2:'第二類優化計畫', opt3:'第三類優化計畫', opt:'優化計畫（類別不明）' };
+  const CATEGORY_ORDER=['emg','opt1','opt2','opt3','opt'];
+  const BUREAU_RESULT={ 1:'tsgh', 2:'songde', 3:'hold' };  /* 衛生局回覆單：轉介三總北投／轉介松德院區／暫不轉介（V9 追加：不會轉介他院） */
+  /* 結案訪視紀錄單「醫療資源轉介」四個選項（V9 追加確認），依此順序顯示；closing.referrals 放代碼 */
+  const REFERRAL={ 1:'醫療資源', 2:'社區支持資源', 3:'社區心理衛生中心', 4:'EIP計畫' };
+  const REFERRAL_LABELS=Object.values(REFERRAL);
+  const REVIEW_RESULT={ 1:'agree', 2:'reject' };            /* 不轉介覆核單：同意／駁回 */
+  const FOLLOW_STATES=['notReturned','trackable','unable'];
+  /* 頁面上「通報類別」按鈕的值 → 案件的 kind */
+  const TYPE_OF={ all:'all', emergency:'emg', optimized:'opt', optimization:'opt' };
+  const HOUR=3600000, DAY=24*HOUR, TAIPEI_OFFSET=8*HOUR;
+
+  const RD=window.RD={
+    loaded:false, version:null, cases:[],
+    platform:null, platformError:null, platformUpdated:null, platformHasTime:false,
+    updatedAt:null, updatedTime:null, updatedHasTime:false, asOf:null, dataStart:null, sample:false, stats:null,
+    ranges:{}, types:{},
+    basicCases(){ const r=RD.ranges.basic; return r ? casesIn(r.start,r.end) : []; },
+    /* AI 頁：data-platform.json 的 ai.predictions 中預測與實測分數都有的筆數（全部，不受篩選） */
+    aiPairs(){ return aiRows().map((a,i)=>({ predicted:a.predicted, measured:a.actual, index:i+1 })); },
+    /* AI 頁：依模型版本（版本第一次出現的預測日期排序，沒有日期的排最後）累積的比對筆數與相關係數 */
+    aiHistory(){
+      const list=aiRows().filter(a=>a.version);
+      const first=new Map();
+      list.forEach(a=>{ const d=first.get(a.version); if(!first.has(a.version) || (a.day && (!d || a.day<d))) first.set(a.version,a.day); });
+      const versions=[...first].sort((a,b)=>(a[1] || '9999').localeCompare(b[1] || '9999') || a[0].localeCompare(b[0],undefined,{ numeric:true }));
+      const out=[], acc=[];
+      versions.forEach(([version,day])=>{
+        list.filter(a=>a.version===version).forEach(a=>acc.push({ predicted:a.predicted, measured:a.actual }));
+        const r=pearson(acc);
+        if(acc.length>=3 && r!=null) out.push({ date:slashDate(day), version:/^v/i.test(version) ? version : `v${version}`, population:acc.length, correlation:r });
+      });
+      return out;
+    }
   };
 
   /* ---------- 小工具 ---------- */
-  const $ = (sel,root=document)=>root.querySelector(sel);
-  const $$ = (sel,root=document)=>[...root.querySelectorAll(sel)];
-  const esc = s=>String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch]);
-  const pad = n=>String(n).padStart(2,'0');
-  const fmtInt = n=>Number(n||0).toLocaleString('zh-TW');
-  const fmt1 = v=>v==null || !isFinite(v) ? '—' : v.toFixed(1);
-  const pct = (n,d)=>d>0 ? n/d*100 : null;
-  const pctText = (n,d)=>d>0 ? `${(n/d*100).toFixed(1)}%` : '—';
-  const slashDate = d=>d ? d.replaceAll('-','/') : '—';
-  const normName = s=>s==null || String(s).trim()==='' ? null : String(s).trim().replace(/台/g,'臺');
-  const toNum = v=>v==null || v==='' || typeof v==='boolean' || !isFinite(Number(v)) ? null : Number(v);
-  const avg = list=>list.length ? list.reduce((s,v)=>s+v,0)/list.length : null;
-  const count = (list,fn)=>list.reduce((n,x)=>n+(fn(x)?1:0),0);
+  const $=(sel,root=document)=>root.querySelector(sel);
+  const $$=(sel,root=document)=>[...root.querySelectorAll(sel)];
+  const esc=s=>String(s).replace(/[&<>"']/g,ch=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[ch]);
+  const pad=n=>String(n).padStart(2,'0');
+  const fmtInt=n=>Number(n||0).toLocaleString('zh-TW');
+  const fmt1=v=>v==null || !isFinite(v) ? '—' : v.toFixed(1);
+  const pct=(n,d)=>d>0 ? n/d*100 : null;
+  const pctText=(n,d)=>d>0 ? `${(n/d*100).toFixed(1)}%` : '—';
+  const slashDate=d=>d ? d.replaceAll('-','/') : '—';
+  const normName=s=>s==null || String(s).trim()==='' ? null : String(s).trim().replace(/台/g,'臺');
+  const normText=s=>s==null || String(s).trim()==='' ? null : String(s).trim();
+  const toNum=v=>v==null || v==='' || typeof v==='boolean' || !isFinite(Number(v)) ? null : Number(v);
+  const avg=list=>list.length ? list.reduce((s,v)=>s+v,0)/list.length : null;
+  const count=(list,fn)=>list.reduce((n,x)=>n+(fn(x)?1:0),0);
+  const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
+  /* 帶正負號的數字；負號用全形減號，與原型一致 */
+  const signed=(v,digits)=>v==null || !isFinite(v) ? '—' : (v>0 ? '+' : v<0 ? '−' : '')+Math.abs(v).toFixed(digits);
+  const minusOnly=(v,digits)=>v==null || !isFinite(v) ? '—' : (v<0 ? '−' : '')+Math.abs(v).toFixed(digits);
+  const setText=(id,text)=>{ const el=document.getElementById(id); if(el) el.textContent=text; };
+  function groupCount(values){
+    const m=new Map();
+    values.forEach(v=>m.set(v,(m.get(v)||0)+1));
+    return [...m].map(([key,n])=>({ key, n })).sort((a,b)=>b.n-a.n || String(a.key).localeCompare(String(b.key),'zh-Hant'));
+  }
+  function pearson(rows){
+    const n=rows.length;
+    if(n<2) return null;
+    const mx=rows.reduce((s,r)=>s+r.predicted,0)/n, my=rows.reduce((s,r)=>s+r.measured,0)/n;
+    let num=0, dx=0, dy=0;
+    rows.forEach(r=>{ const a=r.predicted-mx, b=r.measured-my; num+=a*b; dx+=a*a; dy+=b*b; });
+    return dx>0 && dy>0 ? num/Math.sqrt(dx*dy) : null;
+  }
+  const aiRows=()=>RD.platform?.ai || [];
 
   /* 時間字串 → 毫秒。沒有時區的字串（含只有日期）一律視為臺北時間 */
   function parseTime(v){
@@ -21095,11 +23068,22 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
     const t=Date.parse(s);
     return Number.isNaN(t) ? null : t;
   }
-  const dayKey = t=>new Date(t+TAIPEI_OFFSET).toISOString().slice(0,10);
-  const clockText = t=>new Date(t+TAIPEI_OFFSET).toISOString().slice(11,16);   /* 臺北時間 HH:mm */
-  /* 兩個時間點相差幾小時；任一端缺值或順序顛倒（資料錯誤）時回傳 null，不列入平均 */
-  const hoursBetween = (a,b)=>a==null || b==null || b<a ? null : (b-a)/HOUR;
-  const avgHours = (list,from,to)=>avg(list.map(c=>hoursBetween(c[from],c[to])).filter(v=>v!=null));
+  const dayKey=t=>new Date(t+TAIPEI_OFFSET).toISOString().slice(0,10);
+  const clockText=t=>new Date(t+TAIPEI_OFFSET).toISOString().slice(11,16);
+  /* 兩個時間點的差（以 unit 毫秒為一單位）；任一端缺值或順序顛倒（資料錯誤）時回傳 null，不列入平均 */
+  const span=(a,b,unit)=>a==null || b==null || b<a ? null : (b-a)/unit;
+  const spanAvg=(list,from,to,unit)=>avg(list.map(c=>span(c[from],c[to],unit)).filter(v=>v!=null));
+  const ordered=(c,keys)=>keys.every((k,i)=>c[k]!=null && (i===0 || c[k]>=c[keys[i-1]]));
+  /* 回覆單上的「訪視日期」「派案日期」常只有日期：只有日期時以通報日起算的天數計（同一天＝0），有時間時照實際時間差 */
+  function daysFromReport(c,raw){
+    const t=parseTime(raw);
+    if(t==null) return null;
+    if(/^\d{4}-\d{2}-\d{2}$/.test(String(raw).trim())){
+      const d=(Date.parse(dayKey(t))-Date.parse(c.day))/DAY;
+      return d<0 ? null : d;
+    }
+    return span(c.reported,t,DAY);
+  }
 
   /* ---------- 載入 ---------- */
   /* 逐字走過 JSON 文字，字串內容原樣保留，字串外的字元交給 keep(text,i) 決定：回傳下一個位置，或 -1 表示照抄 */
@@ -21134,26 +23118,57 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
     catch(err){ throw new Error(`${name} 不是有效的 JSON（${err.message}）`); }
   }
 
-  async function loadFromServer(){
-    const res=await fetch(DATA_FILE,{cache:'no-store'});
-    if(res.status===404) throw new Error(`找不到 ${DATA_FILE}`);
-    if(!res.ok) throw new Error(`${DATA_FILE}：HTTP ${res.status}`);
-    return parseJsonLoose(await res.text(),DATA_FILE);
+  async function fetchText(file){
+    const res=await fetch(file,{ cache:'no-store' });
+    if(res.status===404) throw new Error(`找不到 ${file}`);
+    if(!res.ok) throw new Error(`${file}：HTTP ${res.status}`);
+    return res.text();
   }
-  /* file:// 備援：使用者手動選取 data.json（檔名不限，方便測試其他資料檔） */
+  async function loadFromServer(){
+    const [dataText,platform]=await Promise.all([
+      fetchText(DATA_FILE),
+      LOAD_PLATFORM
+        ? fetchText(PLATFORM_FILE).then(t=>({ obj:parseJsonLoose(t,PLATFORM_FILE) }),err=>({ error:err.message || String(err) }))
+        : {}
+    ]);
+    return { raw:parseJsonLoose(dataText,DATA_FILE), platform:platform.obj || null, platformError:platform.error || null };
+  }
+  /* file:// 備援：手動選檔，可以一次選 data.json 與 data-platform.json（依內容判斷是哪一個，檔名不限） */
   async function loadFromPicker(fileList){
-    const f=fileList[0];
-    if(!f) throw new Error('沒有選取檔案');
-    return parseJsonLoose(await f.text(),f.name);
+    const files=[...fileList];
+    if(!files.length) throw new Error('沒有選取檔案');
+    let raw=null, platform=null;
+    for(const f of files){
+      const obj=parseJsonLoose(await f.text(),f.name);
+      if(obj && (Array.isArray(obj.emg) || Array.isArray(obj.opt))) raw=obj;
+      else if(obj && (obj.snq || obj.usage || obj.ai)) platform=obj;
+      else throw new Error(`看不出 ${f.name} 是 data.json 還是 data-platform.json`);
+    }
+    if(!raw) throw new Error(LOAD_PLATFORM ? '請選取 data.json（可以同時選 data-platform.json）' : '請選取 data.json');
+    /* SHOW_PLATFORM、SHOW_AI 都是 false：選了 data-platform.json 也不用 */
+    if(!LOAD_PLATFORM) return { raw, platform:null, platformError:null };
+    return { raw, platform, platformError:platform ? null : `未選取 ${PLATFORM_FILE}` };
   }
 
-  function normalizeCase(r,stats){
+  function scoreSet(s){
+    if(!s || typeof s!=='object') return null;
+    const o={}; let any=false;
+    SCALES.forEach(k=>{ o[k]=toNum(s[k]); if(o[k]!=null) any=true; });
+    return any ? o : null;
+  }
+  function useSet(s){
+    if(!s || typeof s!=='object') return null;
+    const opd=toNum(s.opd), er=toNum(s.er);
+    return opd==null && er==null ? null : { opd, er };
+  }
+
+  function normalizeCase(r,kind,stats){
     const tp=r.timePoint || {}, info=r.caseInfo || {}, assess=r.assess || {};
     const reported=parseTime(tp.reportedAt);
     if(reported==null){ stats.badTime++; return null; }
 
-    /* caseInfo.county 是縣市全名（選填）；caseInfo.dict 是行政區，「大安」「大安區」「臺北市大安區」都可以，開頭帶縣市時拆出來。
-       沒有縣市時，能對到臺北市 12 區的算臺北市（基隆市也有中正、信義、中山區，所以排程最好給 county），其餘有行政區的算外縣市 */
+    /* caseInfo.county 是縣市全名（選填）；caseInfo.dict 是行政區，開頭帶縣市時拆出來。
+       沒有縣市時，能對到臺北市 12 區的算臺北市（基隆市也有中正、信義、中山區），其餘有行政區的算外縣市 */
     let county=normName(info.county), district=normName(info.dict);
     const prefix=district && COUNTIES.find(name=>district.startsWith(name));
     if(prefix){ county=county || prefix; district=district.slice(prefix.length) || null; }
@@ -21162,7 +23177,7 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
     const lat=toNum(info.latitude), lng=toNum(info.longitude), hasCoord=lat!=null && lng!=null;
 
     const assigned=parseTime(tp.assignedAt);
-    /* status：0 未結案（再依有沒有指派分成待派／已派）、1 已結案、2 未開案／結案 */
+    /* status：0 未結案（再依有沒有指派分成待派／已派）、1 已結案、2 未轉介／開案 */
     const st=toNum(r.status);
     const status=st===1 ? 'closed' : st===2 ? 'not_referred' : st===0 ? (assigned==null ? 'pending_assign' : 'assigned') : null;
     if(!status) stats.badStatus++;
@@ -21172,92 +23187,192 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
     if(dept!=null && !DEPARTMENT[dept]) stats.unmappedDept++;
 
     const levels={};
-    Object.entries(SCALE_ROW).forEach(([key,row])=>{
-      const v=toNum(assess[key]);
-      if(LEVELS[v]) levels[row]=LEVELS[v];
-    });
+    Object.entries(SCALE_ROW).forEach(([key,row])=>{ const v=toNum(assess[key]); if(LEVELS[v]) levels[row]=LEVELS[v]; });
 
-    /* 滿意度：問卷於結案時發出，所以已結案（或已有分數）的案件算一份應回收問卷；StatisfactionAvg 有值才算已回收 */
+    /* 滿意度：問卷於結案時發出，已結案（或已有分數）的案件算一份應回收問卷；有分數才算已回收 */
     const score=toNum(r.StatisfactionAvg ?? r.SatisfactionAvg);
     const scored=score!=null && score>=1 && score<=5;
 
+    let category='emg';
+    if(kind==='opt'){
+      category=OPT_CATEGORY[toNum(r.optType)] || 'opt';
+      if(category==='opt') stats.badOptType++;
+    }
+
     const day=dayKey(reported);
-    return {
-      id:String(r.reportId ?? ''),
+    const c={
+      id:String(r.reportId ?? ''), kind, category,
       reported, day, year:Number(day.slice(0,4)),
-      age:toNum(info.age),
-      gender:GENDER[toNum(info.gender)] || 'U',
+      age:toNum(info.age), gender:GENDER[toNum(info.gender)] || 'U',
       status,
-      risk:levels.scale || null,   /* 初評風險＝風險檢傷評估（CTRS）的等級；效率頁總覽與地圖點位用 */
-      network,
-      county, district,
+      risk:levels.scale || null,   /* 初評風險＝風險檢傷評估（CTRS）的等級 ★ */
+      network, county, district,
       lat:hasCoord ? lat : null, lng:hasCoord ? lng : null,
       addressKey:null,             /* 沒有地址雜湊，同址合併改用座標 */
-      assigned,
-      intakeMethod:ACCEPT_WAY[toNum(r.acceptWay)] || null,
-      intake:parseTime(tp.acceptedAt),
-      dispatched:parseTime(tp.outsideAt),
       levels,
+      assigned, closed:parseTime(tp.closedAt),
       surveys:status==='closed' || scored ? [{ completed:scored, scores:scored ? [score] : [] }] : []
     };
+
+    /* v2：emg 與 opt 共用的區塊，沒有資料為 null */
+    const sc=r.scores && typeof r.scores==='object' ? r.scores : null;
+    c.scores=sc ? { initial:scoreSet(sc.initial), m3:scoreSet(sc.m3), m6:scoreSet(sc.m6) } : null;
+    const fu=r.followUp && typeof r.followUp==='object' ? r.followUp : {};
+    c.followUp={ m3:FOLLOW_STATES.includes(fu.m3) ? fu.m3 : null, m6:FOLLOW_STATES.includes(fu.m6) ? fu.m6 : null };
+    const his=r.his && typeof r.his==='object' ? r.his : null;
+    c.his=his ? { ipdBefore:toNum(his.ipdBefore), opdBefore:toNum(his.opdBefore), ipdAfter:toNum(his.ipdAfter), psyOpdAfter:toNum(his.psyOpdAfter), homeOpdAfter:toNum(his.homeOpdAfter) } : null;
+    /* AI 預測不在 data.json（2026-11-11 移到 data-platform.json 的 ai.predictions）；通報裡就算有 ai 也不讀 */
+
+    if(kind==='emg'){
+      c.intakeMethod=ACCEPT_WAY[toNum(r.acceptWay)] || null;
+      c.intake=parseTime(tp.acceptedAt);
+      c.dispatched=parseTime(tp.outsideAt);
+    }else{
+      const b=r.bureau && typeof r.bureau==='object' ? r.bureau : null;
+      const rv=r.review && typeof r.review==='object' ? r.review : null;
+      const h=r.hospital && typeof r.hospital==='object' ? r.hospital : null;
+      const mu=r.monthlyUse && typeof r.monthlyUse==='object' ? r.monthlyUse : null;
+      const cl=r.closing && typeof r.closing==='object' ? r.closing : null;
+      c.bureauReplied=parseTime(tp.bureauRepliedAt);
+      c.reviewed=parseTime(tp.reviewedAt);
+      c.hospitalReplied=parseTime(tp.hospitalRepliedAt);
+      c.firstVisit=parseTime(tp.firstVisitAt);
+      c.bureauResult=b ? (BUREAU_RESULT[toNum(b.result)] || null) : null;
+      c.noReferralReason=b ? normText(b.noReferralReason) : null;
+      c.bureauVisitDays=b ? daysFromReport(c,b.visitDate) : null;
+      c.bureauDecisionDays=b ? daysFromReport(c,b.dispatchDate) : null;
+      c.reviewResult=rv ? (REVIEW_RESULT[toNum(rv.result)] || null) : null;
+      c.opened=h && typeof h.opened==='boolean' ? h.opened : null;
+      c.unableReason=h ? normText(h.unableReason) : null;
+      c.contact=h ? parseTime(h.contactAt) : null;
+      c.monthly={ first:useSet(mu?.first), closing:useSet(mu?.closing) };
+      c.closing=cl ? {
+        reason:normText(cl.reason), lost:cl.lostContact===true, refused:cl.refused===true,
+        referrals:Array.isArray(cl.referrals) ? [...new Set(cl.referrals.map(v=>referralLabel(v,stats)).filter(Boolean))] : []
+      } : null;
+    }
+    return c;
   }
 
-  function build(raw){
+  /* closing.referrals 的一個值 → 選項名稱：代碼 1–4（數字或數字字串），直接寫選項名稱也接受；對不到的保留原值並在頁首提示 */
+  function referralLabel(v,stats){
+    if(v==null || v==='') return null;
+    const code=toNum(v);
+    if(code!=null && REFERRAL[code]) return REFERRAL[code];
+    const text=normText(v);
+    if(text && REFERRAL_LABELS.includes(text)) return text;
+    stats.unmappedReferral++;
+    return text ? `代碼 ${text}（未對應）` : null;
+  }
+
+  function build(raw,platform,platformError){
     if(!raw || typeof raw!=='object' || Array.isArray(raw)) throw new Error(`${DATA_FILE} 的最外層不是物件`);
-    const version=raw.schemaVersion==null ? SCHEMA_VERSION : raw.schemaVersion;
-    if(Number(version)!==SCHEMA_VERSION) throw new Error(`${DATA_FILE} 的 schemaVersion 是 ${version}，這版儀表板只支援 ${SCHEMA_VERSION}`);
-    if(!Array.isArray(raw.emg)) throw new Error(`${DATA_FILE} 沒有 emg 陣列`);
-    const stats={ badTime:0, badStatus:0, unmappedDept:0, dupId:0 };
-    const cases=raw.emg.map(r=>normalizeCase(r || {},stats)).filter(Boolean);
+    const version=raw.schemaVersion==null ? 1 : Number(raw.schemaVersion);
+    if(!SCHEMA_VERSIONS.includes(version)) throw new Error(`${DATA_FILE} 的 schemaVersion 是 ${raw.schemaVersion}，這版儀表板支援 ${SCHEMA_VERSIONS.join('、')}`);
+    if(!Array.isArray(raw.emg) && !Array.isArray(raw.opt)) throw new Error(`${DATA_FILE} 沒有 emg 或 opt 陣列`);
+    const stats={ badTime:0, badStatus:0, unmappedDept:0, dupId:0, badOptType:0, unmappedReferral:0, beforeStart:0 };
+    const all=[
+      ...(Array.isArray(raw.emg) ? raw.emg : []).map(r=>normalizeCase(r || {},'emg',stats)),
+      ...(Array.isArray(raw.opt) ? raw.opt : []).map(r=>normalizeCase(r || {},'opt',stats))
+    ].filter(Boolean);
+    /* 平台起始日以前不會有通報；萬一有（測試資料、轉檔），不列入任何頁面，只在頁首提示件數 */
+    const cases=all.filter(c=>c.day>=PLATFORM_START);
+    stats.beforeStart=all.length-cases.length;
     /* reportId 應該唯一。重複時照樣計數、不自動去重（萬一是兩筆不同的通報撞號，刪掉反而少算），只在頁首提示 */
     const seen=new Set();
     cases.forEach(c=>{ if(!c.id) return; if(seen.has(c.id)) stats.dupId++; else seen.add(c.id); });
     const days=cases.map(c=>c.day).sort();
     RD.cases=cases;
     RD.stats=stats;
-    /* updatedAt 可以只有日期或含時間（排程應帶時間與 +08:00），日期篩選取臺北日期；無法解析時當作沒填 */
+    RD.version=version;
     const updated=parseTime(raw.updatedAt);
     RD.updatedTime=updated;
     RD.updatedHasTime=updated!=null && /\d:\d\d/.test(String(raw.updatedAt));
     RD.updatedAt=updated==null ? null : dayKey(updated);
     RD.asOf=raw.asOf || RD.updatedAt || days[days.length-1] || dayKey(Date.now());
-    RD.dataStart=raw.dataStart || days[0] || RD.asOf;
+    RD.dataStart=PLATFORM_START;
     RD.sample=raw.sample===true;
+    buildPlatform(platform,platformError);
     RD.loaded=true;
   }
 
-  function casesIn(start,end){ return RD.cases.filter(c=>c.day>=start && c.day<=end); }
-
-  /* ---------- 日期篩選（五個分頁共用） ---------- */
-  function presetRange(kind){
-    const end=RD.asOf, [y,m]=end.split('-').map(Number);
-    if(kind==='today') return [end,end];
-    if(kind==='month') return [`${y}-${pad(m)}-01`,end];
-    if(kind==='quarter') return [`${y}-${pad(Math.floor((m-1)/3)*3+1)}-01`,end];
-    if(kind==='year') return [`${y}-01-01`,end];
-    return [RD.dataStart,end];   /* all：資料起日到截止日 */
+  function buildPlatform(p,error){
+    RD.platform=null; RD.platformError=error || null; RD.platformUpdated=null; RD.platformHasTime=false;
+    if(!p) return;
+    try{
+      if(typeof p!=='object' || Array.isArray(p)) throw new Error(`${PLATFORM_FILE} 的最外層不是物件`);
+      const v=p.schemaVersion==null ? PLATFORM_SCHEMA_VERSION : Number(p.schemaVersion);
+      if(v!==PLATFORM_SCHEMA_VERSION) throw new Error(`${PLATFORM_FILE} 的 schemaVersion 是 ${p.schemaVersion}，這版只支援 ${PLATFORM_SCHEMA_VERSION}`);
+      const units=Array.isArray(p.usage?.units)
+        ? p.usage.units.map(u=>({ name:normText(u?.name) || '未命名單位', total:toNum(u?.total) ?? 0, loggedIn:toNum(u?.loggedIn) ?? 0 })).filter(u=>u.total>0)
+        : null;
+      const months=Array.isArray(p.snq?.months) ? p.snq.months.filter(m=>m && /^\d{4}-\d{2}$/.test(String(m.month))) : null;
+      /* AI 頁：一筆預測一個物件；預測或實測分數缺一的不列入。date 只用來排模型版本的先後 */
+      const ai=Array.isArray(p.ai?.predictions)
+        ? p.ai.predictions.map(a=>{
+            const t=parseTime(a?.date);
+            const version=a?.modelVersion==null || String(a.modelVersion).trim()==='' ? null : String(a.modelVersion).trim();
+            return { day:t==null ? null : dayKey(t), predicted:toNum(a?.predicted), actual:toNum(a?.actual), version };
+          }).filter(a=>a.predicted!=null && a.actual!=null)
+        : null;
+      const t=parseTime(p.updatedAt);
+      RD.platform={ units, months, ai, sample:p.sample===true };
+      RD.platformUpdated=t;
+      RD.platformHasTime=t!=null && /\d:\d\d/.test(String(p.updatedAt));
+    }catch(err){
+      RD.platform=null;
+      RD.platformError=err.message || String(err);
+    }
   }
 
-  const PAGES = {
-    basic:{ quick:'#basicQuickFilter', attr:'basicFilter', start:'basicStartDate', end:'basicEndDate', apply:'basicApplyRange', label:null, initial:'year', render:renderBasic },
-    risk:{ quick:'#riskQuickFilter', attr:'riskRange', start:'riskStartDate', end:'riskEndDate', apply:'riskApplyRange', label:'riskRangeLabel', initial:'year', render:renderRisk },
-    efficiency:{ quick:'#efficiencyQuickFilter', attr:'effRange', start:'efficiencyStartDate', end:'efficiencyEndDate', apply:'efficiencyApplyRange', label:'efficiencyRangeLabel', initial:'year', render:renderEfficiency },
-    reporter:{ quick:'#reporterQuickFilter', attr:'reporterRange', start:'reporterStartDate', end:'reporterEndDate', apply:'reporterApplyRange', label:'reporterRangeLabel', initial:'year', render:renderReporter },
+  function casesIn(start,end){ return RD.cases.filter(c=>c.day>=start && c.day<=end); }
+  const byType=(cases,type)=>!type || type==='all' ? cases : cases.filter(c=>c.kind===type);
+
+  /* ---------- 日期與通報類別篩選（各分頁共用） ---------- */
+  function presetRange(kind){
+    const end=RD.asOf, [y,m]=end.split('-').map(Number);
+    const from=s=>s<PLATFORM_START ? PLATFORM_START : s;   /* 平台起始日以前沒有資料：2026 年的本季、本年度都從 10/05 起 */
+    if(kind==='today') return [end,end];
+    if(kind==='month') return [from(`${y}-${pad(m)}-01`),end];
+    if(kind==='quarter') return [from(`${y}-${pad(Math.floor((m-1)/3)*3+1)}-01`),end];
+    if(kind==='year') return [from(`${y}-01-01`),end];
+    return [RD.dataStart,end];   /* all：平台起始日到截止日 */
+  }
+
+  const PAGES={
+    basic:{ quick:'#basicQuickFilter', attr:'basicFilter', start:'basicStartDate', end:'basicEndDate', apply:'basicApplyRange', label:null, type:null, initial:'year', render:renderBasic },
+    risk:{ quick:'#riskQuickFilter', attr:'riskRange', start:'riskStartDate', end:'riskEndDate', apply:'riskApplyRange', label:'riskRangeLabel', type:{ sel:'#riskFilter', attr:'filter' }, initial:'year', render:renderRisk },
+    efficiency:{ quick:'#efficiencyQuickFilter', attr:'effRange', start:'efficiencyStartDate', end:'efficiencyEndDate', apply:'efficiencyApplyRange', label:'efficiencyRangeLabel', type:null, initial:'year', render:renderEfficiency },
+    outcome:{ quick:'#outcomeQuickFilter', attr:'outcomeRange', start:'outcomeStartDate', end:'outcomeEndDate', apply:'outcomeApplyRange', label:null, type:{ sel:'#outcomeFilter', attr:'filter' }, initial:'year', render:renderOutcome },
+    reporter:{ quick:'#reporterQuickFilter', attr:'reporterRange', start:'reporterStartDate', end:'reporterEndDate', apply:'reporterApplyRange', label:'reporterRangeLabel', type:{ sel:'#reporterTypeFilter', attr:'reporterType' }, initial:'year', render:renderReporter },
+    hospital:{ quick:'#hospitalQuickFilter', attr:'hospitalRange', start:'hospitalStartDate', end:'hospitalEndDate', apply:'hospitalApplyRange', label:null, type:{ sel:'#hospitalTypeFilter', attr:'hospitalType' }, initial:'year', render:renderHospital },
+    snq:{ quick:'#snqQuickFilter', attr:'snqRange', start:'snqStartDate', end:'snqEndDate', apply:'snqApplyRange', label:null, type:{ sel:'#snqTypeFilter', attr:'snqType' }, initial:'year', render:renderSnq },
     /* 指揮板預設看全部期間（沒有快速鈕亮起），與原型相同 */
-    command:{ quick:'#commandQuickFilter', attr:'range', start:'commandStartDate', end:'commandEndDate', apply:'commandApplyRange', label:'commandRangeLabel', initial:'all', render:renderCommand }
+    command:{ quick:'#commandQuickFilter', attr:'range', start:'commandStartDate', end:'commandEndDate', apply:'commandApplyRange', label:'commandRangeLabel', type:null, initial:'all', render:renderCommandFlow }
   };
+
+  function renderPage(page){
+    const cfg=PAGES[page], r=RD.ranges[page];
+    if(!cfg || !r) return;
+    const type=RD.types[page] || 'all';
+    const cases=casesIn(r.start,r.end);
+    cfg.render({ cases, filtered:byType(cases,type), range:r, type });
+  }
 
   function setRange(page,start,end,kind){
     const cfg=PAGES[page];
+    /* 手動輸入早於平台起始日的日期（日期欄位的 min 擋不住鍵盤輸入）時拉回起始日 */
+    if(start<PLATFORM_START) start=PLATFORM_START;
+    if(end<PLATFORM_START) end=PLATFORM_START;
     if(start>end) [start,end]=[end,start];
-    RD.ranges[page]={start,end};
+    RD.ranges[page]={ start, end };
     const s=document.getElementById(cfg.start), e=document.getElementById(cfg.end);
     if(s) s.value=start;
     if(e) e.value=end;
     $$(`${cfg.quick} button`).forEach(b=>b.classList.toggle('active',kind!=null && b.dataset[cfg.attr]===kind));
     const label=cfg.label && document.getElementById(cfg.label);
     if(label) label.textContent=`${slashDate(start)}－${slashDate(end)}`;
-    cfg.render(casesIn(start,end));
+    renderPage(page);
   }
 
   function wirePage(page){
@@ -21273,36 +23388,41 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
       const s=document.getElementById(cfg.start)?.value, e=document.getElementById(cfg.end)?.value;
       if(s && e) setRange(page,s,e,null);
     });
+    if(cfg.type){
+      const box=$(cfg.type.sel);
+      box?.addEventListener('click',event=>{
+        const btn=event.target.closest('button');
+        if(!btn || !box.contains(btn)) return;
+        $$('button',box).forEach(b=>b.classList.toggle('active',b===btn));
+        RD.types[page]=TYPE_OF[btn.dataset[cfg.type.attr]] || 'all';
+        if(RD.loaded) renderPage(page);
+      });
+    }
   }
 
   function initDateInputs(){
-    const yearStart=`${RD.asOf.slice(0,4)}-01-01`;
-    const min=RD.dataStart<yearStart ? RD.dataStart : yearStart;
     Object.values(PAGES).forEach(cfg=>[cfg.start,cfg.end].forEach(id=>{
       const el=document.getElementById(id);
-      if(el){ el.min=min; el.max=RD.asOf; }
+      if(el){ el.min=PLATFORM_START; el.max=RD.asOf; }
     }));
   }
 
   /* ---------- 長條圖共用 ---------- */
   /* 座標軸上限＝4 個整齊刻度（刻度間距取下列其一），四等分後每格都是整數 */
-  const NICE_STEPS = [1,2,3,5,10,15,20,25,30,40,50,75,100,150,200,250,300,400,500,750,1000];
-  function niceMax(v){
-    const step=NICE_STEPS.find(s=>s*4>=v) ?? Math.ceil(v/4000)*1000;
-    return step*4;
-  }
-  const barHeight = (v,max)=>v>0 ? Math.max(2,v/max*100) : 0;
+  const NICE_STEPS=[1,2,3,5,10,15,20,25,30,40,50,75,100,150,200,250,300,400,500,750,1000];
+  function niceMax(v){ const step=NICE_STEPS.find(s=>s*4>=v) ?? Math.ceil(v/4000)*1000; return step*4; }
+  const barHeight=(v,max)=>v>0 ? Math.max(2,v/max*100) : 0;
   function setAxis(el,max){
     if(el) el.innerHTML=[max,Math.round(max*.75),Math.round(max*.5),Math.round(max*.25),0].map(v=>`<span>${v}</span>`).join('');
   }
 
-  /* ---------- 基本資料 ---------- */
-  function renderBasic(cases){
+  /* ---------- 基本資料（緊急醫療＋優化計畫，沒有通報類別篩選） ---------- */
+  function renderBasic({ cases }){
     const status=s=>count(cases,c=>c.status===s);
     const kpis=[cases.length,status('pending_assign'),status('assigned'),status('closed'),status('not_referred')];
     $$('#basic .basic-kpi-value').forEach((el,i)=>{ el.textContent=fmtInt(kpis[i]); });
 
-    /* 臺北市 12 區（沒有案件也列出），其後依序是外縣市、不詳（沒有縣市也沒有行政區，或臺北市但行政區空白／對不到），三者合計＝總收案件數 */
+    /* 臺北市 12 區（沒有案件也列出），其後依序是外縣市、不詳，三者合計＝總收案件數 */
     const tp=cases.filter(c=>c.county==='臺北市' && TAIPEI_DISTRICTS.includes(c.district));
     const rows=TAIPEI_DISTRICTS.map((name,i)=>({ name:name.replace(/區$/,''), value:count(tp,c=>c.district===name), i }))
       .sort((a,b)=>b.value-a.value || a.i-b.i);
@@ -21325,7 +23445,7 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
     if(aBars) aBars.innerHTML=ages.map(a=>{
       const h=barHeight(a.value,aMax).toFixed(1);
       const tip=a.label==='不詳' ? `年齡不詳｜${a.value} 人次` : `${a.label} 歲｜${a.value} 人次`;
-      return `<div class="bar-col" data-tooltip="${tip}" style="--age-bar-height:${h}%"><div class="vbar" style="height:${h}%"></div><span>${a.label}</span></div>`;
+      return `<div class="bar-col" data-tooltip="${tip}" title="${tip}" style="--age-bar-height:${h}%"><div class="vbar" style="height:${h}%"></div><span>${a.label}</span></div>`;
     }).join('');
     setAxis($('#basic .age-chart .y-axis'),aMax);
 
@@ -21353,11 +23473,11 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
   }
 
   /* ---------- 通報案件風險分析 ---------- */
-  function renderRisk(cases){
+  function renderRisk({ filtered }){
     $$('#risk .risk-stack').forEach(stack=>{
       const key=stack.dataset.key;
       const n={ low:0, medium:0, high:0 };
-      cases.forEach(c=>{ const lv=c.levels[key]; if(lv) n[lv]++; });
+      filtered.forEach(c=>{ const lv=c.levels[key]; if(lv) n[lv]++; });
       const total=n.low+n.medium+n.high;
       stack.classList.toggle('rd-empty',!total);
       stack.dataset.empty='此區間沒有初評資料';
@@ -21372,65 +23492,290 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
     });
   }
 
-  /* ---------- 案件處理效率指標（緊急醫療） ---------- */
-  function setEff(scope,key,value){
-    $$(`[data-eff-value="${key}"]`,scope).forEach(el=>{ el.textContent=fmt1(value); });
-    $$(`[data-eff-ring="${key}"]`,scope).forEach(el=>{ el.style.setProperty('--p',String(value==null ? 0 : Math.min(100,Math.max(0,value)))); });
-  }
-  function renderEfficiency(cases){
-    const root=$('#efficiency');
-    if(!root) return;
-    /* 分母：受理方式為電話或電話＋緊急醫療出勤的通報 */
-    const handled=cases.filter(c=>c.intakeMethod==='phone' || c.intakeMethod==='phone_dispatch');
+  /* ---------- 案件處理效率指標（四個頁籤與同期比較共用同一套算法） ---------- */
+  function effMetrics(cases){
+    const v={}, n={};
+    const emg=cases.filter(c=>c.kind==='emg'), opt=cases.filter(c=>c.kind==='opt');
+
+    /* 緊急醫療：分母＝受理方式為電話或電話＋出勤的通報 */
+    const handled=emg.filter(c=>c.intakeMethod);
     const phone=handled.filter(c=>c.intakeMethod==='phone');
     const dispatch=handled.filter(c=>c.intakeMethod==='phone_dispatch');
-    setEff(root,'emergencyClose',pct(count(handled,c=>c.status==='closed'),handled.length));
-    setEff(root,'phoneRate',pct(phone.length,handled.length));
-    setEff(root,'dispatchRate',pct(dispatch.length,handled.length));
-
-    /* 兩條流程各自用「每一段時間都有」的案件計算，各段平均加起來才會等於總反應時間 */
-    const ordered=(c,keys)=>keys.every((k,i)=>c[k]!=null && (i===0 || c[k]>=c[keys[i-1]]));
+    v.emergencyClose=pct(count(handled,c=>c.status==='closed'),handled.length);
+    v.phoneRate=pct(phone.length,handled.length);
+    v.dispatchRate=pct(dispatch.length,handled.length);
+    /* 兩條流程各自只取「每一段時間都有、先後順序正確」的案件，各段平均相加才會等於總反應時間 */
     const phoneDone=phone.filter(c=>ordered(c,['reported','assigned','intake']));
     const dispatchDone=dispatch.filter(c=>ordered(c,['reported','assigned','intake','dispatched']));
+    const flows={
+      phone:{ n:phoneDone.length, assign:spanAvg(phoneDone,'reported','assigned',HOUR), assess:spanAvg(phoneDone,'assigned','intake',HOUR), total:spanAvg(phoneDone,'reported','intake',HOUR) },
+      dispatch:{ n:dispatchDone.length, assign:spanAvg(dispatchDone,'reported','assigned',HOUR), assess:spanAvg(dispatchDone,'assigned','intake',HOUR),
+        prepare:spanAvg(dispatchDone,'intake','dispatched',HOUR), total:spanAvg(dispatchDone,'reported','dispatched',HOUR) }
+    };
+    const bothFlows=[...phoneDone,...dispatchDone];
+    v.emergencyAssign=spanAvg(bothFlows,'reported','assigned',HOUR);   /* 同期比較用：兩條流程合併 */
+    v.emergencyAssess=spanAvg(bothFlows,'assigned','intake',HOUR);
+    v.emergencyPrepare=flows.dispatch.prepare;
+    v.emergencyPhoneTotal=flows.phone.total;
+    v.emergencyTotal=flows.dispatch.total;
+
+    /* 總覽：依初評風險，緊醫「完成受理方式」、優化計畫「完成首次訪視」減通報時間，以天計 */
+    [['riskHigh','high'],['riskMedium','medium'],['riskLow','low']].forEach(([key,lv])=>{
+      const list=cases.filter(c=>c.risk===lv).map(c=>span(c.reported,c.kind==='emg' ? c.intake : c.firstVisit,DAY)).filter(x=>x!=null);
+      v[key]=avg(list); n[key]=list.length;
+    });
+
+    /* 優化計畫：衛生局回覆單分流 */
+    const replied=opt.filter(c=>c.bureauResult);
+    const tsgh=replied.filter(c=>c.bureauResult==='tsgh'), songde=replied.filter(c=>c.bureauResult==='songde'), hold=replied.filter(c=>c.bureauResult==='hold');
+    /* 醫院端 */
+    v.hospitalOpen=pct(count(tsgh,c=>c.opened===true),tsgh.length);
+    v.reviewAgree=pct(count(hold,c=>c.reviewResult==='agree'),hold.length);
+    v.reviewReject=pct(count(hold,c=>c.reviewResult==='reject'),hold.length);
+    v.nonReferralIntervention=pct(count(hold,c=>c.opened===true),hold.length);
+    v.reviewTime=spanAvg(hold,'bureauReplied','reviewed',DAY);
+    v.referralAssign=spanAvg(tsgh,'bureauReplied','assigned',HOUR);
+    /* 轉介案件首次聯繫：首次聯繫（第一份評估訪視紀錄單的填寫時間）減轉介單填寫時間（reportedAt），第一～三類都算（使用者 2026-11-11） */
+    v.referralContact=spanAvg(opt,'reported','contact',HOUR);
+    v.afterAssignContact=spanAvg(opt,'assigned','contact',HOUR);
+    v.firstProfessional=spanAvg(opt,'assigned','firstVisit',DAY);
+    v.replyBureau=spanAvg(opt,'assigned','hospitalReplied',DAY);
+    /* 衛生局 */
+    /* 轉介醫療機構＝轉介三總北投＋轉介松德院區；醫療轉介率的分母＝已完成回覆單（V9 追加確認） */
+    v.bureauReferral=pct(tsgh.length+songde.length,replied.length);
+    v.bureauToHospital=pct(tsgh.length,replied.length);
+    v.songdeReferral=pct(songde.length,replied.length);
+    v.hospitalShare=pct(tsgh.length,tsgh.length+songde.length);
+    v.nonReferralRate=pct(hold.length,replied.length);
+    v.bureauVisit=avg(opt.map(c=>c.bureauVisitDays).filter(x=>x!=null));
+    v.bureauDecision=avg(opt.map(c=>c.bureauDecisionDays).filter(x=>x!=null));
+    v.bureauReply=spanAvg(opt,'reported','bureauReplied',DAY);
+
+    return {
+      values:v, n, flows,
+      bureau:{ replied:replied.length, tsgh:tsgh.length, songde:songde.length, hold:hold.length, reasons:groupCount(hold.map(c=>c.noReferralReason || '未填原因')) }
+    };
+  }
+
+  function setEff(scope,key,value){
+    $$(`[data-eff-value="${key}"]`,scope).forEach(el=>{ el.textContent=fmt1(value); });
+    $$(`[data-eff-ring="${key}"]`,scope).forEach(el=>{ el.style.setProperty('--p',String(value==null ? 0 : clamp(value,0,100))); });
+  }
+
+  function renderEfficiency({ cases }){
+    const root=$('#efficiency');
+    if(!root) return;
+    const m=effMetrics(cases);
+    Object.entries(m.values).forEach(([key,value])=>setEff(root,key,value));
+    $$('[data-eff-computed="songdeReferral"]',root).forEach(el=>{ el.textContent=fmt1(m.values.songdeReferral); });
+
     const phoneBlock=$('.v4-flow-block[aria-label="電話受理流程"]',root);
     const dispatchBlock=$('.v4-flow-block[aria-label="電話加出勤受理流程"]',root);
     if(phoneBlock){
-      setEff(phoneBlock,'emergencyAssign',avgHours(phoneDone,'reported','assigned'));
-      setEff(phoneBlock,'emergencyAssess',avgHours(phoneDone,'assigned','intake'));
-      setEff(phoneBlock,'emergencyPhoneTotal',avgHours(phoneDone,'reported','intake'));
-      phoneBlock.title=`N = ${phoneDone.length} 件（受理方式為電話、且派案與受理時間皆有紀錄）`;
+      setEff(phoneBlock,'emergencyAssign',m.flows.phone.assign);
+      setEff(phoneBlock,'emergencyAssess',m.flows.phone.assess);
+      setEff(phoneBlock,'emergencyPhoneTotal',m.flows.phone.total);
+      phoneBlock.title=`N = ${m.flows.phone.n} 件（受理方式為電話、且派案與受理時間皆有紀錄）`;
     }
     if(dispatchBlock){
-      setEff(dispatchBlock,'emergencyAssign',avgHours(dispatchDone,'reported','assigned'));
-      setEff(dispatchBlock,'emergencyAssess',avgHours(dispatchDone,'assigned','intake'));
-      setEff(dispatchBlock,'emergencyPrepare',avgHours(dispatchDone,'intake','dispatched'));
+      setEff(dispatchBlock,'emergencyAssign',m.flows.dispatch.assign);
+      setEff(dispatchBlock,'emergencyAssess',m.flows.dispatch.assess);
+      setEff(dispatchBlock,'emergencyPrepare',m.flows.dispatch.prepare);
+      setEff(dispatchBlock,'emergencyTotal',m.flows.dispatch.total);
+      dispatchBlock.title=`N = ${m.flows.dispatch.n} 件（受理方式為電話＋出勤、且派案／受理／出勤時間皆有紀錄）`;
     }
-    /* 出勤總反應時間同時出現在出勤流程與總覽摘要卡 */
-    setEff(root,'emergencyTotal',avgHours(dispatchDone,'reported','dispatched'));
-    if(dispatchBlock) dispatchBlock.title=`N = ${dispatchDone.length} 件（受理方式為電話＋出勤、且派案／受理／出勤時間皆有紀錄）`;
 
-    /* 總覽：各初評風險等級從通報到完成受理方式的平均時間 */
-    const risk=[['riskHigh','high'],['riskMedium','medium'],['riskLow','low']].map(([key,lv])=>{
-      const list=cases.filter(c=>c.risk===lv).map(c=>hoursBetween(c.reported,c.intake)).filter(v=>v!=null);
-      return { key, n:list.length, value:avg(list) };
+    const riskKeys=['riskHigh','riskMedium','riskLow'];
+    const max=Math.max(...riskKeys.map(k=>m.values[k] || 0));
+    riskKeys.forEach(k=>{
+      $$(`[data-eff-n="${k}"]`,root).forEach(el=>{ el.textContent=`N = ${fmtInt(m.n[k])}`; });
+      $$(`[data-eff-bar="${k}"]`,root).forEach(el=>{ el.style.width=`${max>0 && m.values[k]!=null ? m.values[k]/max*100 : 0}%`; });
     });
-    const max=Math.max(...risk.map(r=>r.value||0));
-    risk.forEach(r=>{
-      setEff(root,r.key,r.value);
-      $$(`[data-eff-n="${r.key}"]`,root).forEach(el=>{ el.textContent=`N = ${fmtInt(r.n)}`; });
-      $$(`[data-eff-bar="${r.key}"]`,root).forEach(el=>{ el.style.width=`${max>0 && r.value!=null ? r.value/max*100 : 0}%`; });
+
+    const b=m.bureau;
+    $$('[data-eff-count="replied"]',root).forEach(el=>{ el.textContent=fmtInt(b.replied); });
+    ['tsgh','songde','hold'].forEach(k=>$$(`[data-eff-count="${k}"]`,root).forEach(el=>{ el.textContent=`${fmtInt(b[k])} 件`; }));
+    const body=$('#effBureauReasonBody');
+    if(body) body.innerHTML=b.reasons.length
+      ? b.reasons.map(r=>`<tr><td>${esc(r.key)}</td><td>${fmtInt(r.n)}</td><td>${pctText(r.n,b.hold)}</td></tr>`).join('')
+      : '<tr><td colspan="3" class="qa-empty-cell">此區間沒有暫不轉介的案件</td></tr>';
+  }
+
+  /* ---------- 精神症狀改善成效指標 ---------- */
+  /* 改善率＝（初評 − 追蹤）÷ 初評；GAF 分數越高越好，方向相反。> +1% 改善、< −1% 變差、其餘持平 */
+  const OUTCOME_METRICS={
+    bsrs3:{ scale:'BSRS5', period:'m3', title:'BSRS-5 三個月' },   bsrs6:{ scale:'BSRS5', period:'m6', title:'BSRS-5 六個月' },
+    cgi3:{ scale:'CGIS', period:'m3', title:'CGI-S 三個月' },      cgi6:{ scale:'CGIS', period:'m6', title:'CGI-S 六個月' },
+    gaf3:{ scale:'GAF', period:'m3', title:'GAF 三個月', higherBetter:true }, gaf6:{ scale:'GAF', period:'m6', title:'GAF 六個月', higherBetter:true },
+    risk3:{ scale:'CTRS', period:'m3', title:'風險減傷評估 三個月' }, risk6:{ scale:'CTRS', period:'m6', title:'風險減傷評估 六個月' }
+  };
+  const OUTCOME_FLAT=1.0;
+  const OUTCOME_TYPE_LABEL={ all:'全部', emg:'緊急醫療', opt:'優化計畫' };
+  const classifyChange=v=>v>OUTCOME_FLAT ? '改善' : v< -OUTCOME_FLAT ? '變差' : '持平';
+  const outcomeState={ metric:'bsrs3', status:'all', sort:{ column:'change', direction:'desc' }, cases:[], type:'all' };
+
+  function outcomeRows(cases,key){
+    const m=OUTCOME_METRICS[key];
+    if(!m) return [];
+    return cases.map(c=>{
+      const a=c.scores?.initial?.[m.scale], b=c.scores?.[m.period]?.[m.scale];
+      if(a==null || b==null || a<=0) return null;
+      const change=(m.higherBetter ? b-a : a-b)/a*100;
+      return { id:c.id, category:CATEGORY_LABEL[c.category], categoryIndex:CATEGORY_ORDER.indexOf(c.category), change, status:classifyChange(change) };
+    }).filter(Boolean);
+  }
+
+  function renderOutcomeCards(cases){
+    $$('#outcome .outcome-card').forEach(card=>{
+      const rows=outcomeRows(cases,card.dataset.metric);
+      const n=rows.length;
+      const imp=count(rows,r=>r.status==='改善'), flat=count(rows,r=>r.status==='持平'), worse=n-imp-flat;
+      const pi=n ? imp/n*100 : 0, pf=n ? flat/n*100 : 0, pw=n ? 100-pi-pf : 0;
+      card.querySelector('.outcome-n').textContent=`N=${n}`;
+      card.querySelector('.outcome-avg').textContent=n ? `${minusOnly(avg(rows.map(r=>r.change)),1)}%` : '—';
+      card.querySelector('.outcome-donut').style.background=n
+        ? `conic-gradient(#24a66a 0 ${pi.toFixed(3)}%, #f1a23a ${pi.toFixed(3)}% ${(pi+pf).toFixed(3)}%, #df554b ${(pi+pf).toFixed(3)}% 100%)`
+        : '#e8ecf1';
+      card.querySelector('.outcome-breakdown').innerHTML=`
+        <div class="improve"><span>改善</span><strong>${imp} (${pi.toFixed(1)}%)</strong></div>
+        <div class="flat"><span>持平</span><strong>${flat} (${pf.toFixed(1)}%)</strong></div>
+        <div class="worse"><span>變差</span><strong>${worse} (${pw.toFixed(1)}%)</strong></div>`;
     });
   }
 
+  function renderOutcomeDialog(){
+    const st=outcomeState;
+    const metric=OUTCOME_METRICS[st.metric];
+    const dir=st.sort.direction==='asc' ? 1 : -1;
+    const rows=outcomeRows(st.cases,st.metric)
+      .filter(r=>st.status==='all' || r.status===st.status)
+      .sort((a,b)=>{
+        const res=st.sort.column==='category' ? a.categoryIndex-b.categoryIndex || b.change-a.change : a.change-b.change;
+        return res*dir;
+      });
+    setText('outcomeDialogTitle',`${metric ? metric.title : ''}｜個案明細`);
+    setText('outcomeDialogSubtitle','持平閾值：-1.0% ～ +1.0%（含）；> +1.0% 為改善，< -1.0% 為變差。');
+    const tbody=document.getElementById('outcomeDetailBody');
+    if(tbody) tbody.innerHTML=rows.map(r=>{
+      const cls=r.status==='改善' ? 'improve' : r.status==='持平' ? 'flat' : 'worse';
+      return `<tr><td>${esc(r.category)}</td><td>${r.change>0 ? '+' : ''}${r.change.toFixed(1)}%</td><td><span class="outcome-badge ${cls}">${r.status}</span></td></tr>`;
+    }).join('');
+    const empty=document.getElementById('outcomeDialogEmpty');
+    if(empty) empty.style.display=rows.length ? 'none' : 'block';
+    const summary=document.getElementById('outcomeDialogSummary');
+    if(summary) summary.innerHTML=`<span class="filter-chip">${OUTCOME_TYPE_LABEL[st.type] || '全部'}</span><span class="filter-chip">${st.status==='all' ? '全部改善類別' : st.status}</span><span>共 ${rows.length} 筆</span>`;
+    $$('.outcome-sort-btn').forEach(btn=>{
+      const active=btn.dataset.sort===st.sort.column;
+      btn.classList.toggle('active',active);
+      btn.classList.toggle('asc',active && st.sort.direction==='asc');
+      btn.classList.toggle('desc',active && st.sort.direction==='desc');
+      const icon=btn.querySelector('.outcome-sort-icon');
+      if(icon) icon.textContent=active ? (st.sort.direction==='asc' ? '↑' : '↓') : '';
+    });
+  }
+
+  function renderFollowup(cases){
+    [['3','m3'],['6','m6']].forEach(([p,key])=>{
+      const states=cases.map(c=>c.followUp[key]).filter(Boolean);
+      const expected=states.length, trackable=count(states,s=>s==='trackable'), unable=count(states,s=>s==='unable'), returned=trackable+unable;
+      setText(`followup${p}Expected`,`應回收 ${fmtInt(expected)} 份`);
+      setText(`followup${p}TrackableRate`,pctText(trackable,returned));
+      setText(`followup${p}TrackableCount`,`${fmtInt(trackable)} / ${fmtInt(returned)}`);
+      setText(`followup${p}ReturnRate`,pctText(returned,expected));
+      setText(`followup${p}ReturnCount`,`${fmtInt(returned)} / ${fmtInt(expected)}`);
+      setText(`followup${p}UnableRate`,pctText(unable,returned));
+      setText(`followup${p}UnableCount`,`${fmtInt(unable)} / ${fmtInt(returned)}`);
+      const bar=document.getElementById(`followup${p}TrackableBar`);
+      if(bar) bar.style.width=`${pct(trackable,returned) ?? 0}%`;
+    });
+  }
+
+  /* 每月門診／急診次數變化（只有優化計畫有訪視紀錄）與結案後 HIS 次數變化，各個案相減後取平均 */
+  function usageStats(cases){
+    const diffAvg=(list,f)=>avg(list.map(f).filter(v=>v!=null && isFinite(v)));
+    const sub=(a,b)=>a==null || b==null ? null : a-b;
+    const monthly=cases.filter(c=>c.kind==='opt' && c.monthly && c.monthly.first && c.monthly.closing);
+    const his=cases.filter(c=>c.his);
+    return {
+      opd:diffAvg(monthly,c=>sub(c.monthly.closing.opd,c.monthly.first.opd)),
+      er:diffAvg(monthly,c=>sub(c.monthly.closing.er,c.monthly.first.er)),
+      readmission:diffAvg(his,c=>sub(c.his.ipdAfter,c.his.ipdBefore)),
+      psych:diffAvg(his,c=>sub(c.his.psyOpdAfter,c.his.opdBefore)),
+      home:diffAvg(his,c=>sub(c.his.homeOpdAfter,c.his.opdBefore))
+    };
+  }
+  const AXIS_RANGE=3;   /* 每月次數變化數線 −3～+3 */
+  const axisPos=v=>v==null ? 50 : clamp((v+AXIS_RANGE)/(AXIS_RANGE*2)*100,4,96);
+
+  function renderResource(cases,type){
+    const grid=$('#outcome [data-outcome-panel="resource"] .outcome-resource-grid');
+    if(grid) grid.classList.toggle('emergency-only',type==='emg');
+    const r=usageStats(cases);
+    const setHtml=(id,html)=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; };
+    setHtml('resourceOutpatientDelta',`${signed(r.opd,1)} <em>次 / 月</em>`);
+    setHtml('resourceEmergencyDelta',`${signed(r.er,1)} <em>次 / 月</em>`);
+    setHtml('resourceReadmission',`${signed(r.readmission,2)} <em>次 / 人</em>`);
+    setHtml('resourcePsych',`${signed(r.psych,2)} <em>次 / 人</em>`);
+    setHtml('resourceHomeCare',`${signed(r.home,2)} <em>次 / 人</em>`);
+    const op=document.getElementById('resourceOutpatientMarker'), er=document.getElementById('resourceEmergencyMarker');
+    if(op) op.style.left=`${axisPos(r.opd)}%`;
+    if(er) er.style.left=`${axisPos(r.er)}%`;
+  }
+
+  function renderOutcome({ filtered, type }){
+    outcomeState.cases=filtered;
+    outcomeState.type=type;
+    renderOutcomeCards(filtered);
+    renderFollowup(filtered);
+    renderResource(filtered,type);
+    const dialog=document.getElementById('outcomeDetailDialog');
+    if(dialog?.open) renderOutcomeDialog();
+  }
+
+  function wireOutcome(){
+    const bar=$('#outcomeViewTabs');
+    bar?.addEventListener('click',event=>{
+      const btn=event.target.closest('.outcome-v62-tab');
+      if(!btn) return;
+      const target=btn.dataset.outcomeTab;
+      $$('.outcome-v62-tab',bar).forEach(b=>{ const on=b===btn; b.classList.toggle('active',on); b.setAttribute('aria-selected',on ? 'true' : 'false'); });
+      $$('#outcome .outcome-v62-panel').forEach(p=>{ const on=p.dataset.outcomePanel===target; p.classList.toggle('active',on); p.hidden=!on; });
+    });
+    const dialog=document.getElementById('outcomeDetailDialog');
+    $$('#outcome .outcome-donut-btn').forEach(btn=>btn.addEventListener('click',()=>{
+      if(!RD.loaded || !dialog) return;
+      outcomeState.metric=btn.closest('.outcome-card').dataset.metric;
+      outcomeState.status='all';
+      outcomeState.sort={ column:'change', direction:'desc' };
+      $$('.outcome-status-btn').forEach(b=>b.classList.toggle('active',b.dataset.status==='all'));
+      renderOutcomeDialog();
+      if(typeof dialog.showModal==='function') dialog.showModal(); else dialog.setAttribute('open','');
+    }));
+    document.getElementById('closeOutcomeDialog')?.addEventListener('click',()=>dialog?.close());
+    dialog?.addEventListener('click',e=>{ if(e.target===dialog) dialog.close(); });
+    const statusBox=document.getElementById('outcomeStatusFilter');
+    statusBox?.addEventListener('click',event=>{
+      const btn=event.target.closest('.outcome-status-btn');
+      if(!btn) return;
+      $$('.outcome-status-btn',statusBox).forEach(b=>b.classList.toggle('active',b===btn));
+      outcomeState.status=btn.dataset.status;
+      renderOutcomeDialog();
+    });
+    $$('.outcome-sort-btn').forEach(btn=>btn.addEventListener('click',()=>{
+      const column=btn.dataset.sort, s=outcomeState.sort;
+      /* 同一欄再按一次反轉；換欄時通報類別從正序開始、改善百分比從倒序開始 */
+      outcomeState.sort=s.column===column ? { column, direction:s.direction==='asc' ? 'desc' : 'asc' } : { column, direction:column==='change' ? 'desc' : 'asc' };
+      renderOutcomeDialog();
+    }));
+  }
+
   /* ---------- 通報者基本資料分析 ---------- */
-  const REPORTER_WARM_PALETTE = ['#8F1D1D','#A92B20','#C23B22','#D95224','#E96B2C','#F1843D','#F6A65A'];
-  /* 滿意度分數專用的綠色系，深→淺對應分數高→低 */
-  const REPORTER_GREEN_PALETTE = ['#14532D','#166534','#15803D','#16A34A','#22C55E','#4ADE80','#86EFAC'];
-  /* 「其他」與對應不到的代碼不參與排名配色 */
-  const REPORTER_OTHER_COLOR = { warm:'#C9A58C', green:'#9DBFAE' };
-  const REPORTER_UNKNOWN_COLOR = '#b8c0cb';
+  const REPORTER_WARM_PALETTE=['#8F1D1D','#A92B20','#C23B22','#D95224','#E96B2C','#F1843D','#F6A65A'];
+  const REPORTER_GREEN_PALETTE=['#14532D','#166534','#15803D','#16A34A','#22C55E','#4ADE80','#86EFAC'];
+  const REPORTER_OTHER_COLOR={ warm:'#C9A58C', green:'#9DBFAE' };
+  const REPORTER_UNKNOWN_COLOR='#b8c0cb';
   /* tail：0 七大網絡、1 其他、2 未填／代碼未對應。排序時先比 tail，「其他」和未填固定排在後面 */
-  const unknownLast = cmp=>(a,b)=>(a.tail-b.tail) || cmp(a,b);
+  const unknownLast=cmp=>(a,b)=>(a.tail-b.tail) || cmp(a,b);
 
   function reporterRows(cases){
     const known=new Map(NETWORKS);
@@ -21446,18 +23791,10 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
     const rows=groups.map(g=>{
       const surveys=g.list.flatMap(c=>c.surveys);
       const done=surveys.filter(s=>s.completed);
-      const scores=done.flatMap(s=>s.scores);
-      return {
-        name:g.name, tail:g.tail, count:g.list.length,
-        sent:surveys.length, done:done.length,
-        response:surveys.length ? done.length/surveys.length*100 : null,
-        score:avg(scores)
-      };
+      return { name:g.name, tail:g.tail, count:g.list.length, sent:surveys.length, done:done.length,
+        response:surveys.length ? done.length/surveys.length*100 : null, score:avg(done.flatMap(s=>s.scores)) };
     });
-    /* 暖色依轉介數排名：多→深紅、少→淺橘 */
-    [...rows].filter(r=>!r.tail).sort((a,b)=>b.count-a.count).forEach((r,i)=>{
-      r.color=REPORTER_WARM_PALETTE[Math.min(i,REPORTER_WARM_PALETTE.length-1)];
-    });
+    [...rows].filter(r=>!r.tail).sort((a,b)=>b.count-a.count).forEach((r,i)=>{ r.color=REPORTER_WARM_PALETTE[Math.min(i,REPORTER_WARM_PALETTE.length-1)]; });
     rows.forEach(r=>{ if(r.tail) r.color=r.tail===1 ? REPORTER_OTHER_COLOR.warm : REPORTER_UNKNOWN_COLOR; });
     return rows;
   }
@@ -21506,11 +23843,11 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
       };
       rows.forEach(d=>{
         if(d.count<=0) return;
-        const span=d.count/total*Math.PI*2, a0=angle, a1=angle+span;
+        const a0=angle, a1=angle+d.count/total*Math.PI*2;
         const path=document.createElementNS(NS,'path');
         path.setAttribute('d',arc(a0,a1)); path.setAttribute('fill',d.color);
         path.setAttribute('stroke','#fff'); path.setAttribute('stroke-width','1.5'); path.style.cursor='pointer';
-        path.addEventListener('mousemove',e=>showTip(e,`<strong>${d.name}</strong><br>轉介數量：${d.count} 件<br>占比：${(d.count/total*100).toFixed(1)}%`));
+        path.addEventListener('mousemove',e=>showTip(e,`<strong>${esc(d.name)}</strong><br>轉介數量：${d.count} 件<br>占比：${(d.count/total*100).toFixed(1)}%`));
         path.addEventListener('mouseleave',hideTip);
         svg.appendChild(path);
         const mid=(a0+a1)/2, labelR=118;
@@ -21523,14 +23860,14 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
         angle=a1;
       });
     }
-    legend.innerHTML=rows.map(d=>`<div class="reporter-legend-item"><i style="background:${d.color}"></i><span>${d.name}</span></div>`).join('');
+    legend.innerHTML=rows.map(d=>`<div class="reporter-legend-item"><i style="background:${d.color}"></i><span>${esc(d.name)}</span></div>`).join('');
   }
 
   function barCol(value,label,height,color,cls,tip){
     const col=document.createElement('div');
     col.className='reporter-bar-col';
     col.style.setProperty('--bar-height',`${height}%`);
-    col.innerHTML=`<span class="reporter-bar-value">${value}</span><div class="reporter-bar ${cls}" style="height:${height}%;background:${color}"></div><span class="reporter-bar-label">${label}</span>`;
+    col.innerHTML=`<span class="reporter-bar-value">${value}</span><div class="reporter-bar ${cls}" style="height:${height}%;background:${color}"></div><span class="reporter-bar-label">${esc(label)}</span>`;
     const bar=col.querySelector('.reporter-bar');
     bar.addEventListener('mousemove',e=>showTip(e,tip));
     bar.addEventListener('mouseleave',hideTip);
@@ -21546,70 +23883,245 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
     area.innerHTML='';
     [...rows].sort(unknownLast((a,b)=>b.count-a.count)).forEach(d=>{
       const h=d.count>0 ? Math.max(1,d.count/max*100) : 0;
-      area.appendChild(barCol(d.count,d.name,h,d.color,'reporter-source-bar',`<strong>${d.name}</strong><br>轉介數量：${d.count} 件`));
+      area.appendChild(barCol(d.count,d.name,h,d.color,'reporter-source-bar',`<strong>${esc(d.name)}</strong><br>轉介數量：${d.count} 件`));
     });
   }
 
   function renderReporterSatisfaction(rows){
-    const responseArea=document.getElementById('reporterResponseBars');
-    const responseAxis=document.getElementById('reporterResponseYAxis');
-    const scoreArea=document.getElementById('reporterScoreBars');
-    const scoreAxis=document.getElementById('reporterScoreYAxis');
+    const responseArea=document.getElementById('reporterResponseBars'), responseAxis=document.getElementById('reporterResponseYAxis');
+    const scoreArea=document.getElementById('reporterScoreBars'), scoreAxis=document.getElementById('reporterScoreYAxis');
     /* 沒有問卷的網絡排在最後、顯示「—」 */
     const byDesc=key=>unknownLast((a,b)=>(b[key]??-1)-(a[key]??-1));
-
     if(responseArea && responseAxis){
       buildYAxis(responseAxis,100,5,v=>`${Math.round(v)}%`);
       responseArea.innerHTML='';
       [...rows].sort(byDesc('response')).forEach(d=>{
         const v=d.response, h=v==null ? 0 : Math.max(1,v);
-        const tip=v==null
-          ? `<strong>${d.name}</strong><br>尚無已結案的案件`
-          : `<strong>${d.name}</strong><br>滿意度調查回收率：${v.toFixed(1)}%<br>已回收 ${d.done} ／ 已結案 ${d.sent} 件`;
+        const tip=v==null ? `<strong>${esc(d.name)}</strong><br>尚無已結案的案件`
+          : `<strong>${esc(d.name)}</strong><br>滿意度調查回收率：${v.toFixed(1)}%<br>已回收 ${d.done} ／ 已結案 ${d.sent} 件`;
         responseArea.appendChild(barCol(v==null ? '—' : `${v.toFixed(1)}%`,d.name,h,d.color,'reporter-sat-bar',tip));
       });
     }
-
     if(scoreArea && scoreAxis){
       buildYAxis(scoreAxis,5,5,v=>v.toFixed(0));
       scoreArea.innerHTML='';
       [...rows].sort(byDesc('score')).forEach((d,i)=>{
         const v=d.score, h=v==null ? 0 : Math.max(1,v/5*100);
         const green=d.tail===1 ? REPORTER_OTHER_COLOR.green : d.tail ? REPORTER_UNKNOWN_COLOR : REPORTER_GREEN_PALETTE[Math.min(i,REPORTER_GREEN_PALETTE.length-1)];
-        const tip=v==null
-          ? `<strong>${d.name}</strong><br>尚無回收的問卷`
-          : `<strong>${d.name}</strong><br>滿意度調查平均分：${v.toFixed(1)} / 5<br>已回收 ${d.done} 份（各份平均分再取平均）`;
+        const tip=v==null ? `<strong>${esc(d.name)}</strong><br>尚無回收的問卷`
+          : `<strong>${esc(d.name)}</strong><br>滿意度調查平均分：${v.toFixed(1)} / 5<br>已回收 ${d.done} 份（各份平均分再取平均）`;
         scoreArea.appendChild(barCol(v==null ? '—' : v.toFixed(1),d.name,h,green,'reporter-sat-bar',tip));
       });
     }
   }
 
-  function renderReporter(cases){
-    const rows=reporterRows(cases);
+  function renderReporter({ filtered }){
+    const rows=reporterRows(filtered);
     const total=rows.reduce((s,d)=>s+d.count,0);
-    const subtitle=document.getElementById('reporterPieSubtitle');
-    if(subtitle) subtitle.textContent=`七大網絡｜總轉介數 ${fmtInt(total)} 件`;
+    setText('reporterPieSubtitle',`七大網絡｜總轉介數 ${fmtInt(total)} 件`);
     renderReporterPie(rows,total);
     renderReporterSourceBars(rows);
     renderReporterSatisfaction(rows);
   }
 
-  /* ---------- 指揮儀表板：指揮板 ---------- */
-  function renderCommand(cases){
-    const status=s=>count(cases,c=>c.status===s);
-    const row={ total:cases.length, Pending:status('pending_assign'), Assigned:status('assigned'), Closed:status('closed'), NotAccepted:status('not_referred') };
-    const setText=(id,text)=>{ const el=document.getElementById(id); if(el) el.textContent=text; };
-    /* 本檔只保留緊急醫療：左側總數＝緊急醫療一列 */
-    ['command','commandEmergency'].forEach(prefix=>{
-      setText(prefix==='command' ? 'commandTotal' : 'commandEmergency',fmtInt(row.total));
-      ['Pending','Assigned','Closed','NotAccepted'].forEach(k=>{
-        setText(`${prefix}${k}`,fmtInt(row[k]));
-        setText(`${prefix}${k}Pct`,pctText(row[k],row.total));
-      });
+  /* ---------- 醫療機構端處理成效分析（V9：優化計畫專屬／共同指標） ---------- */
+  /* better：'down' 越少越好、'up' 越多越好、null 只描述增減（門診次數增減的好壞沒有定義） */
+  const HOSPITAL_DELTAS={
+    monthlyOpd:{ unit:'次 / 月', digits:1, better:null,
+      up:'↑ 結案時較第一次評估訪視增加', down:'↓ 結案時較第一次評估訪視減少', flat:'— 與第一次評估訪視時相同' },
+    monthlyEr:{ unit:'次 / 月', digits:1, better:'down',
+      up:'↑ 結案時較第一次評估訪視增加', down:'↓ 結案時較第一次評估訪視減少', flat:'— 與第一次評估訪視時相同' },
+    readmission:{ unit:'次 / 人', digits:2, better:'down', up:'↑ 較收案前一年增加', down:'↓ 較收案前一年減少', flat:'— 與收案前一年相同' },
+    psych:{ unit:'次 / 人', digits:2, better:'up', up:'↑ 結案後門診使用增加', down:'↓ 結案後門診使用減少', flat:'— 與收案前一年相同' },
+    home:{ unit:'次 / 人', digits:2, better:'up', up:'↑ 結案後居家照護使用增加', down:'↓ 結案後居家照護使用減少', flat:'— 與收案前一年相同' }
+  };
+  const hospitalUnable={ rows:[], desc:true };
+
+  /* 轉介選項：固定四項（REFERRAL 的順序）；資料裡有對不到的值時接在後面，方便發現 */
+  function referralLabels(cases){
+    const extra=groupCount(cases.flatMap(c=>c.closing ? c.closing.referrals : []).filter(l=>!REFERRAL_LABELS.includes(l))).map(r=>r.key);
+    return [...REFERRAL_LABELS,...extra];
+  }
+
+  function setV9Ratio(key,num,den,prefix=''){
+    const p=den ? num/den*100 : null;
+    $$(`#hospital [data-v9-rate="${key}"]`).forEach(el=>{ el.textContent=p==null ? '—' : `${p.toFixed(1)}%`; });
+    $$(`#hospital [data-v9-count="${key}"]`).forEach(el=>{ el.textContent=den ? `${prefix}${fmtInt(num)} / ${fmtInt(den)} 人` : '此區間沒有收案個案'; });
+    $$(`#hospital [data-v9-bar="${key}"]`).forEach(el=>{ el.style.width=`${p ?? 0}%`; });
+  }
+
+  function renderV9Delta(key,v){
+    const card=$(`#hospital [data-v9-delta="${key}"]`), cfg=HOSPITAL_DELTAS[key];
+    if(!card || !cfg) return;
+    const dir=v==null ? null : v>0 ? 'up' : v<0 ? 'down' : 'flat';
+    const state=dir==null || !cfg.better || dir==='flat' ? 'neutral' : dir===cfg.better ? 'good' : 'bad';
+    card.classList.toggle('good',state==='good');
+    card.classList.toggle('v9-bad',state==='bad');
+    card.classList.toggle('v9-neutral',state==='neutral');
+    const strong=card.querySelector('[data-v9-strong]');
+    if(strong) strong.innerHTML=`${signed(v,cfg.digits)} <em>${cfg.unit}</em>`;
+    const trend=card.querySelector('[data-v9-trend]');
+    if(trend) trend.textContent=dir==null ? '此區間尚無資料' : cfg[dir];
+    const marker=card.querySelector('[data-v9-marker]');
+    if(marker) marker.style.left=`${axisPos(v)}%`;
+  }
+
+  function renderHospitalUnable(){
+    const rows=hospitalUnable.rows;
+    const total=rows.reduce((s,r)=>s+r.n,0);
+    const tbody=document.getElementById('hospitalUnableTbody');
+    if(tbody){
+      const sorted=[...rows].sort((a,b)=>a.n!==b.n ? (hospitalUnable.desc ? b.n-a.n : a.n-b.n) : String(a.key).localeCompare(String(b.key),'zh-Hant-TW'));
+      tbody.innerHTML=sorted.length
+        ? sorted.map(r=>`<tr><td>${esc(r.key)}</td><td>${r.n}</td><td>${pctText(r.n,total)}</td></tr>`).join('')
+        : '<tr><td colspan="3" class="qa-empty-cell">此區間沒有無法收案的案件</td></tr>';
+    }
+    setText('hospitalUnableSortIcon',hospitalUnable.desc ? '↓' : '↑');
+    setText('hospitalUnableTotal',fmtInt(total));
+    setText('hospitalUnableCardTotal',fmtInt(total));
+    const top=rows[0];
+    setText('hospitalUnableTop',top ? `最多：${top.key} ${top.n} 件（${pctText(top.n,total)}）` : '此區間沒有無法收案的案件');
+  }
+
+  function renderHospital({ cases, filtered, type }){
+    const emergency=type==='emg';
+    const optPanel=document.getElementById('hospitalOptPanel');
+    if(optPanel) optPanel.hidden=emergency;
+    document.getElementById('hospitalSplitLayout')?.classList.toggle('v9-emergency',emergency);
+    const unableCard=document.getElementById('hospitalUnableCard');
+    if(unableCard) unableCard.hidden=emergency;
+
+    /* 優化計畫專屬：只算優化計畫個案，「全部」與「優化計畫」同一組數字。分母＝收案（醫療機構回覆單開案）人數 */
+    const opt=cases.filter(c=>c.kind==='opt');
+    const admitted=opt.filter(c=>c.opened===true);
+    const den=admitted.length;
+    const anyReferral=count(admitted,c=>c.closing && c.closing.referrals.length>0);
+    setV9Ratio('referral',anyReferral,den,'任一項有轉介 ');
+    const ul=document.getElementById('hospitalReferralSplit');
+    if(ul){
+      ul.innerHTML=referralLabels(admitted).map(label=>{
+        const n=count(admitted,c=>c.closing && c.closing.referrals.includes(label));
+        return `<li title="${esc(label)}：${fmtInt(n)} / ${fmtInt(den)} 人"><span>${esc(label)}</span><b>${pctText(n,den)}</b></li>`;
+      }).join('');
+    }
+    setV9Ratio('lost',count(admitted,c=>c.closing && c.closing.lost),den);
+    setV9Ratio('refused',count(admitted,c=>c.closing && c.closing.refused),den);
+    hospitalUnable.rows=groupCount(opt.filter(c=>c.opened===false).map(c=>c.unableReason || '未填原因'));
+    renderHospitalUnable();
+    const optUsage=usageStats(opt);
+    renderV9Delta('monthlyOpd',optUsage.opd);
+    renderV9Delta('monthlyEr',optUsage.er);
+
+    /* 共同指標：依通報類別 */
+    const shared=usageStats(filtered);
+    renderV9Delta('readmission',shared.readmission);
+    renderV9Delta('psych',shared.psych);
+    renderV9Delta('home',shared.home);
+  }
+
+  function wireHospital(){
+    const card=document.getElementById('hospitalUnableCard'), dialog=document.getElementById('hospitalUnableDialog');
+    if(card && dialog){
+      const open=()=>{ if(typeof dialog.showModal==='function') dialog.showModal(); else dialog.setAttribute('open',''); };
+      card.addEventListener('click',open);
+      card.addEventListener('keydown',e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); open(); } });
+    }
+    document.getElementById('hospitalUnableSort')?.addEventListener('click',()=>{ hospitalUnable.desc=!hospitalUnable.desc; renderHospitalUnable(); });
+    const his=document.getElementById('hospitalHisDialog');
+    document.getElementById('openHospitalHisInfo')?.addEventListener('click',()=>{
+      if(!his) return;
+      if(typeof his.showModal==='function') his.showModal(); else his.setAttribute('open','');
     });
-    setText('commandEmergencyPct',pctText(row.total,row.total));
+    document.getElementById('closeHospitalHisInfo')?.addEventListener('click',()=>his?.close());
+    his?.addEventListener('click',e=>{ if(e.target===his) his.close(); });
+  }
+
+  /* ---------- 醫院內控指標（SNQ）：data-platform.json 的月彙總，日期區間涵蓋到的月份加總後再除 ---------- */
+  const SNQ_SUBS=[['opd','opd'],['home','home'],['inpatient','ipd']];
+  function snqRows(range){
+    const months=RD.platform?.months;
+    if(!months) return null;
+    const a=range.start.slice(0,7), b=range.end.slice(0,7);
+    return months.filter(m=>m.month>=a && m.month<=b);
+  }
+  const sumOf=(rows,get)=>rows.reduce((s,r)=>s+(toNum(get(r)) || 0),0);
+
+  function renderSnq({ range, type }){
+    const rows=snqRows(range);
+    const cards=$$('#snq .snq-card');
+    cards.forEach(card=>{
+      const kind=card.dataset.snqKind;
+      card.hidden=(kind==='emergency' && type==='opt') || (kind==='optimization' && type==='emg');
+      const strong=card.querySelector('.snq-card-value strong'), detail=card.querySelector('.snq-card-value span'), bar=card.querySelector('.snq-progress i');
+      let num=0, den=0, unit='人';
+      if(rows){
+        if(card.dataset.snqMetric){
+          const k=card.dataset.snqMetric;
+          num=sumOf(rows,r=>r[k]?.num); den=sumOf(rows,r=>r[k]?.den);
+        }else if(kind==='emergency' || kind==='optimization'){
+          unit='件';
+          num=sumOf(rows,r=>r.referral?.[kind]?.any); den=sumOf(rows,r=>r.referral?.[kind]?.den);
+          let sum=0;
+          SNQ_SUBS.forEach(([cls,key])=>{
+            const sub=card.querySelector(`.snq-sub.${cls}`);
+            if(!sub) return;
+            const n=sumOf(rows,r=>r.referral?.[kind]?.[key]);
+            const p=den ? n/den*100 : 0;
+            sum+=p;
+            const st=sub.querySelector('strong'), em=sub.querySelector('em'), sb=sub.querySelector('.snq-sub-bar i');
+            if(st) st.textContent=den ? `${p.toFixed(1)}%` : '—';
+            if(em) em.textContent=`${fmtInt(n)} / ${fmtInt(den)} 件`;
+            if(sb) sb.style.width=`${clamp(p,0,100)}%`;
+          });
+          const sumEl=card.querySelector('.snq-breakdown-sum em');
+          if(sumEl) sumEl.textContent=den ? `${sum.toFixed(1)}%` : '—';
+        }
+      }
+      if(strong) strong.textContent=rows && den ? `${(num/den*100).toFixed(1)}%` : '—';
+      if(detail) detail.textContent=!rows ? '尚無資料' : `${fmtInt(num)} / ${fmtInt(den)} ${unit}`;
+      if(bar) bar.style.width=`${rows && den ? clamp(num/den*100,0,100) : 0}%`;
+    });
+    const visible=cards.filter(c=>c.classList.contains('snq-card-referral') && !c.hidden).length;
+    document.getElementById('snqReferralGrid')?.classList.toggle('single',visible===1);
+  }
+
+  function wireSnq(){
+    /* 點「結案後轉介至本院醫療系統比例」卡片，以 dialog 顯示門診／居家／住院各自的比例（卡片內隱藏的 .snq-breakdown 已由 renderSnq 更新） */
+    const dialog=document.getElementById('snqReferralDialog');
+    const open=card=>{
+      if(!dialog) return;
+      setText('snqReferralDialogTitle',card.querySelector('.snq-card-title')?.textContent || '');
+      setText('snqReferralDialogValue',card.querySelector('.snq-card-value strong')?.textContent || '—');
+      setText('snqReferralDialogCount',card.querySelector('.snq-card-value span')?.textContent || '');
+      const body=document.getElementById('snqReferralDialogBody');
+      if(body) body.innerHTML=card.querySelector('.snq-breakdown')?.innerHTML || '';
+      if(typeof dialog.showModal==='function') dialog.showModal(); else dialog.setAttribute('open','');
+    };
+    $$('#snq .snq-card-referral').forEach(card=>{
+      card.setAttribute('role','button');
+      card.setAttribute('tabindex','0');
+      card.addEventListener('click',()=>{ if(!(window.getSelection && String(window.getSelection()))) open(card); });
+      card.addEventListener('keydown',e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); open(card); } });
+    });
+  }
+
+  /* ---------- 指揮儀表板：指揮板 ---------- */
+  function renderCommandFlow({ cases }){
+    const tally=list=>({ total:list.length, Pending:count(list,c=>c.status==='pending_assign'), Assigned:count(list,c=>c.status==='assigned'),
+      Closed:count(list,c=>c.status==='closed'), NotAccepted:count(list,c=>c.status==='not_referred') });
+    const keys=['Pending','Assigned','Closed','NotAccepted'];
+    const all=tally(cases);
+    setText('commandTotal',fmtInt(all.total));
+    keys.forEach(k=>{ setText(`command${k}`,fmtInt(all[k])); setText(`command${k}Pct`,pctText(all[k],all.total)); });
     const totalPct=$('#commandTotalNode small');
-    if(totalPct) totalPct.textContent=pctText(row.total,row.total);
+    if(totalPct) totalPct.textContent=pctText(all.total,all.total);
+    /* 四種通報類別：件數占總通報；各狀態占該類別 */
+    [['commandEmergency','emg'],['commandClass1','opt1'],['commandClass2','opt2'],['commandClass3','opt3']].forEach(([prefix,cat])=>{
+      const row=tally(cases.filter(c=>c.category===cat));
+      setText(prefix,fmtInt(row.total));
+      setText(`${prefix}Pct`,pctText(row.total,all.total));
+      keys.forEach(k=>{ setText(`${prefix}${k}`,fmtInt(row[k])); setText(`${prefix}${k}Pct`,pctText(row[k],row.total)); });
+    });
     if(typeof redrawFlowAfterSettle==='function') redrawFlowAfterSettle(20);
   }
 
@@ -21627,7 +24139,6 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
     }
     const cur=years[0];
     const rateText=v=>v==null ? '—' : v.toFixed(1);
-
     $('.closure-v74-hero',shell)?.setAttribute('aria-label',`${cur.y} 年度結案率`);
     const heroTitle=$('.closure-v74-hero h4',shell);
     if(heroTitle) heroTitle.textContent=`${cur.y} 年結案率`;
@@ -21643,7 +24154,6 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
     const counts=$$('.closure-v74-counts strong',shell);
     if(counts[0]) counts[0].textContent=fmtInt(cur.closed);
     if(counts[1]) counts[1].textContent=fmtInt(cur.total);
-
     $('.closure-v74-trend',shell)?.setAttribute('aria-label',`${firstYear} 至 ${lastYear} 年結案率比較`);
     const period=$('.closure-v74-period',shell);
     if(period) period.textContent=firstYear===lastYear ? String(lastYear) : `${firstYear}–${lastYear}`;
@@ -21657,26 +24167,208 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
     ).join('');
   }
 
+  /* ---------- 指揮儀表板：同期比較（近三年相同期間的效率指標，算法與效率頁相同） ---------- */
+  const COMPARE_GROUPS=[
+    { id:'overview', title:'總覽｜不同風險個案處理時間（平均）', types:['all','emg','opt'], rows:[
+      { key:'riskHigh', name:'高風險個案處理時間', unit:'天', better:'low' },
+      { key:'riskMedium', name:'中風險個案處理時間', unit:'天', better:'low' },
+      { key:'riskLow', name:'低風險個案處理時間', unit:'天', better:'low' } ] },
+    { id:'emergency', title:'緊急醫療處置效率', types:['all','emg'], rows:[
+      { key:'emergencyClose', name:'緊醫案件結案率', unit:'%', better:'high' },
+      { key:'phoneRate', name:'緊醫電話處置率', unit:'%', better:'neutral' },
+      { key:'dispatchRate', name:'緊醫出勤處置率', unit:'%', better:'neutral' },
+      { key:'emergencyAssign', name:'緊醫通報後派案時間', unit:'小時', better:'low' },
+      { key:'emergencyAssess', name:'緊醫首次專業評估時間', unit:'小時', better:'low' },
+      { key:'emergencyPrepare', name:'緊醫出勤準備時間', unit:'小時', better:'low' },
+      { key:'emergencyPhoneTotal', name:'緊醫電話受理總反應時間', unit:'小時', better:'low' },
+      { key:'emergencyTotal', name:'緊醫出勤總反應時間', unit:'小時', better:'low' } ] },
+    { id:'hospital', title:'優化計畫醫院端處置效率', types:['all','opt'], rows:[
+      { key:'hospitalOpen', name:'衛生局轉介案件開案率', unit:'%', better:'high' },
+      { key:'reviewAgree', name:'暫不轉介覆核同意率', unit:'%', better:'neutral' },
+      { key:'reviewReject', name:'暫不轉介覆核駁回率', unit:'%', better:'neutral' },
+      { key:'nonReferralIntervention', name:'暫不轉介案件醫療介入率', unit:'%', better:'high' },
+      { key:'reviewTime', name:'暫不轉介案件覆核時間', unit:'天', better:'low' },
+      { key:'referralAssign', name:'轉介案件派案時間', unit:'小時', better:'low' },
+      { key:'referralContact', name:'轉介案件首次聯繫時間', unit:'小時', better:'low' },
+      { key:'afterAssignContact', name:'派案後首次聯繫時間', unit:'小時', better:'low' },
+      { key:'firstProfessional', name:'首次專業評估時間', unit:'天', better:'low' },
+      { key:'replyBureau', name:'回覆衛生局時間', unit:'天', better:'low' } ] },
+    { id:'bureau', title:'優化計畫衛生局處置效率', types:['all','opt'], rows:[
+      { key:'bureauReferral', name:'衛生局醫療轉介率', unit:'%', better:'high' },
+      { key:'bureauToHospital', name:'衛生局轉介本院率', unit:'%', better:'high' },
+      { key:'hospitalShare', name:'本院醫療轉介占率', unit:'%', better:'high' },
+      { key:'nonReferralRate', name:'衛生局暫不轉介率', unit:'%', better:'low' },
+      { key:'bureauVisit', name:'衛生局訪視時間', unit:'天', better:'low' },
+      { key:'bureauDecision', name:'衛生局分流決策時間', unit:'天', better:'low' },
+      { key:'bureauReply', name:'衛生局回覆通報時間', unit:'天', better:'low' } ] }
+  ];
+  const compareState={ mode:'ytd', month:null, type:'all' };
+  const lastDayOf=(y,m)=>new Date(Date.UTC(y,m,0)).getUTCDate();
+
+  /* 三個年度各自的比較期間：同期累計＝1/1～asOf 的月日；同月＝本月 1 日～asOf 的日；其他月份＝整月（本月則到 asOf 的日，未來的月份本年度沒有資料）。
+     平台 2026/10/05 才啟用（PLATFORM_START）：期間整段在這天以前＝disabled（欄位保留，標示「平台未啟用」、數字「—」）；
+     跨過這天＝partial（照算，資料只有這天以後的，欄位標示「10/5 起」） */
+  function comparePeriods(){
+    const [Y,M,D]=RD.asOf.split('-').map(Number);
+    const mode=compareState.mode, month=compareState.month ?? M;
+    const span=y=>{
+      const cap=m=>pad(Math.min(D,lastDayOf(y,m)));
+      if(mode==='ytd') return { year:y, start:`${y}-01-01`, end:`${y}-${pad(M)}-${cap(M)}` };
+      if(mode==='month') return { year:y, start:`${y}-${pad(M)}-01`, end:`${y}-${pad(M)}-${cap(M)}` };
+      if(month>M && y===Y) return { year:y, future:true };
+      const end=month===M ? cap(month) : pad(lastDayOf(y,month));
+      return { year:y, start:`${y}-${pad(month)}-01`, end:`${y}-${pad(month)}-${end}` };
+    };
+    return [Y-2,Y-1,Y].map(y=>{
+      const p=span(y);
+      if(p.future) return p;
+      if(p.end<PLATFORM_START) p.disabled=true;
+      else if(p.start<PLATFORM_START) p.partial=true;
+      return p;
+    });
+  }
+
+  function renderComparison(){
+    const box=document.getElementById('commandCompareMetrics');
+    if(!box || !RD.loaded) return;
+    const [, M, D]=RD.asOf.split('-').map(Number);
+    const mode=compareState.mode, month=compareState.month ?? M;
+    const periods=comparePeriods();
+    const title=mode==='ytd' ? `同期累計｜1/1－${M}/${D}` : mode==='month' ? `同月比較｜${M}/1－${M}/${D}`
+      : `其他月份比較｜${month} 月${month===M ? `（1–${D} 日）` : ''}`;
+    setText('commandCompareRangeTitle',title);
+    const startText=slashDate(PLATFORM_START);
+    const startMD=`${Number(PLATFORM_START.slice(5,7))}/${Number(PLATFORM_START.slice(8,10))}`;
+    setText('commandCompareRangeNote',periods.some(p=>p.disabled || p.partial)
+      ? `比較近三年相同期間・平台 ${startText} 啟用，之前沒有資料` : '比較近三年相同期間');
+    const values=periods.map(p=>p.future || p.disabled ? null : effMetrics(byType(casesIn(p.start,p.end),compareState.type)).values);
+    const isRate=row=>row.unit==='%';
+    const toDate=mode==='customMonth' && month<M ? null : `${M}/${D}`;   /* 本年度的期間到哪天；null＝整月 */
+    const yearNote=(p,i)=>{
+      if(p.future) return '尚未發生';
+      if(p.disabled) return '平台未啟用';
+      if(p.partial) return i===2 && toDate ? `${startMD}－${toDate}` : `${startMD} 起`;
+      if(i===2) return toDate ? `截至 ${toDate}` : '整月';
+      return `民國${p.year-1911}年`;
+    };
+    const yearTip=p=>p.disabled ? ` title="平台 ${startText} 啟用，這段期間沒有資料"`
+      : p.partial ? ` title="平台 ${startText} 啟用，只計算這天以後的資料"` : '';
+    const head=`<thead><tr><th class="cmp-name">指標</th>`
+      +periods.map((p,i)=>`<th class="cmp-year${i===2?' current':''}${p.disabled?' cmp-disabled':''}"${yearTip(p)}>${p.year}<small>${yearNote(p,i)}</small></th>`).join('')
+      +`<th class="cmp-change-head">較去年</th></tr></thead>`;
+    const changeCell=(row,prev,cur)=>{
+      if(prev==null || cur==null) return '<td class="cmp-change none">—</td>';
+      const d=Math.round((cur-prev)*10)/10;
+      if(Math.abs(d)<.05) return '<td class="cmp-change flat">持平</td>';
+      const up=d>0;
+      let cls='neutral';
+      if(row.better==='high') cls=up ? 'better' : 'worse';
+      if(row.better==='low') cls=up ? 'worse' : 'better';
+      return `<td class="cmp-change ${cls}"><b>${up?'▲':'▼'} ${Math.abs(d).toFixed(1)}</b><small>${isRate(row) ? '個百分點' : row.unit}</small></td>`;
+    };
+    const groups=COMPARE_GROUPS.filter(g=>g.types.includes(compareState.type));
+    const html=groups.map(g=>{
+      const rows=g.rows.map(row=>{
+        const vals=values.map(v=>v ? (v[row.key] ?? null) : null);
+        const max=Math.max(...vals.filter(v=>v!=null),.0001);
+        const cells=vals.map((v,i)=>`<td class="cmp-val${i===2?' current':''}${v==null?' no-data':''}${periods[i].disabled?' cmp-disabled':''}">`
+          +`<span><b>${fmt1(v)}</b>${v==null ? '' : `<em>${row.unit}</em>`}</span>`
+          +`<i class="cmp-bar"><i style="width:${v==null ? 0 : (v/max*100).toFixed(1)}%"></i></i></td>`).join('');
+        return `<tr><th class="cmp-name" scope="row">${row.name}</th>${cells}${changeCell(row,vals[1],vals[2])}</tr>`;
+      }).join('');
+      return `<section class="cmp-group cmp-${g.id}"><h4>${g.title}</h4><div class="cmp-table-wrap"><table class="cmp-table">${head}<tbody>${rows}</tbody></table></div></section>`;
+    });
+    /* 四組長度差很多（3～10 列），依序放進目前較短的一欄，兩欄高度才接近 */
+    const cols=[{ h:0, html:'' },{ h:0, html:'' }];
+    groups.forEach((g,i)=>{ const col=cols[0].h<=cols[1].h ? cols[0] : cols[1]; col.h+=g.rows.length+2; col.html+=html[i]; });
+    box.innerHTML=cols.map(c=>`<div class="cmp-col">${c.html}</div>`).join('');
+  }
+
+  function wireComparison(){
+    const modeBox=document.getElementById('commandCompareMode');
+    const monthWrap=document.getElementById('commandCompareMonthSelect');
+    const monthSel=document.getElementById('commandCompareMonth');
+    modeBox?.addEventListener('click',event=>{
+      const btn=event.target.closest('button[data-mode]');
+      if(!btn) return;
+      $$('button',modeBox).forEach(b=>b.classList.toggle('active',b===btn));
+      compareState.mode=btn.dataset.mode;
+      if(monthWrap) monthWrap.hidden=compareState.mode!=='customMonth';
+      renderComparison();
+    });
+    monthSel?.addEventListener('change',()=>{ compareState.month=Number(monthSel.value); renderComparison(); });
+    const typeBox=document.getElementById('commandCompareTypeFilter');
+    typeBox?.addEventListener('click',event=>{
+      const btn=event.target.closest('.risk-filter-btn');
+      if(!btn) return;
+      $$('.risk-filter-btn',typeBox).forEach(b=>b.classList.toggle('active',b===btn));
+      compareState.type=TYPE_OF[btn.dataset.compareType] || 'all';
+      renderComparison();
+    });
+  }
+
+  /* ---------- 指揮儀表板：平台使用率（data-platform.json，統計至資料日，不受日期篩選影響） ---------- */
+  function renderUsage(){
+    const list=document.getElementById('usageUnitList');
+    if(!list) return;
+    const units=RD.platform?.units;
+    const asOf=RD.platformUpdated==null ? null : dayKey(RD.platformUpdated);
+    setText('usageAsOf',asOf ? `統計至 ${slashDate(asOf)}` : '尚無資料');
+    const donut=document.getElementById('usageDonut');
+    const rateEl=document.getElementById('usageRate');
+    if(!units || !units.length){
+      donut?.style.setProperty('--closure-rate','0');
+      if(rateEl) rateEl.innerHTML='—<span>%</span>';
+      setText('usageLoggedIn','—'); setText('usageTotal','—');
+      list.style.setProperty('--usage-rows',1);
+      list.innerHTML=`<p class="qa-platform-missing">${RD.platformError ? `平台資料載入失敗：${esc(RD.platformError)}` : 'data-platform.json 沒有平台使用率資料'}</p>`;
+      return;
+    }
+    const total=units.reduce((s,u)=>s+u.total,0), loggedIn=units.reduce((s,u)=>s+u.loggedIn,0);
+    const rate=total ? (loggedIn/total*100).toFixed(1) : '0.0';
+    donut?.style.setProperty('--closure-rate',rate);
+    donut?.setAttribute('aria-label',`平台使用率 ${rate}%`);
+    if(rateEl) rateEl.innerHTML=`${rate}<span>%</span>`;
+    setText('usageLoggedIn',fmtInt(loggedIn));
+    setText('usageTotal',fmtInt(total));
+    /* 使用率高到低；同分時帳號多的在前 */
+    const rows=units.map(u=>({ ...u, rate:u.total ? u.loggedIn/u.total*100 : 0 })).sort((a,b)=>b.rate-a.rate || b.total-a.total);
+    list.style.setProperty('--usage-rows',rows.length);
+    list.innerHTML=rows.map(u=>{
+      const r=u.rate.toFixed(1);
+      return `<div class="closure-v74-row" title="${esc(u.name)}：曾登入 ${fmtInt(u.loggedIn)} / 總帳號 ${fmtInt(u.total)} 個，使用率 ${r}%">`
+        +`<div class="closure-v74-year"><strong>${esc(u.name)}</strong><span>未曾登入 ${fmtInt(u.total-u.loggedIn)} 個</span></div>`
+        +`<div class="closure-v74-bar-area"><div class="closure-v74-bar-track"><i style="width:${r}%"></i></div>`
+        +`<span class="closure-v74-fraction">${fmtInt(u.loggedIn)} / ${fmtInt(u.total)} 個</span></div>`
+        +`<strong class="closure-v74-rate">${r}%</strong></div>`;
+    }).join('');
+  }
+
   /* ---------- 頁首狀態列 ---------- */
+  function timeText(t,hasTime){ return t==null ? null : `${slashDate(dayKey(t))}${hasTime ? ` ${clockText(t)}` : ''}`; }
   function renderStatus(){
     const el=document.getElementById('rdStatus');
     if(!el) return;
     el.classList.remove('rd-error');
     const parts=[];
-    if(RD.sample) parts.push('<span class="rd-sample">範例資料（虛構）</span>');
-    parts.push(RD.updatedAt
-      ? `<span>資料更新 <b>${slashDate(RD.updatedAt)}${RD.updatedHasTime ? ` ${clockText(RD.updatedTime)}` : ''}</b></span>`
+    if(RD.sample || RD.platform?.sample) parts.push('<span class="rd-sample">範例資料（虛構）</span>');
+    parts.push(RD.updatedTime!=null
+      ? `<span>資料更新 <b>${timeText(RD.updatedTime,RD.updatedHasTime)}</b></span>`
       : `<span>資料截止 <b>${slashDate(RD.asOf)}</b></span>`);
-    /* 排程停了：data.json 照樣讀得到，只是越來越舊，要讓看的人知道（範例資料不提示） */
+    /* 排程停了：檔案照樣讀得到，只是越來越舊，要讓看的人知道（範例資料不提示） */
     const age=RD.updatedTime==null ? null : (Date.now()-RD.updatedTime)/HOUR;
     if(!RD.sample && age!=null && age>STALE_AFTER_HOURS) parts.push(`<span class="rd-warn">資料已 ${Math.floor(age/24)} 天未更新</span>`);
-    parts.push(`<span>總案件數 <b>${fmtInt(RD.cases.length)}</b> 件（${slashDate(RD.dataStart)} 起）</span>`);
-    /* 資料品質提示：排除的筆數、對不到代碼的筆數、重複的 reportId */
+    const emgN=count(RD.cases,c=>c.kind==='emg'), optN=RD.cases.length-emgN;
+    parts.push(`<span>總案件數 <b>${fmtInt(RD.cases.length)}</b> 件（緊急醫療 ${fmtInt(emgN)}／優化計畫 ${fmtInt(optN)}，${slashDate(RD.dataStart)} 起）</span>`);
+    if(RD.platformError) parts.push(`<span class="rd-warn">平台資料（${PLATFORM_PAGES}）未載入：${esc(RD.platformError)}</span>`);
     const s=RD.stats;
     if(s.badTime) parts.push(`<span class="rd-warn">已排除：通報時間無法解析 ${s.badTime} 件</span>`);
+    if(s.beforeStart) parts.push(`<span class="rd-warn">已排除：通報日早於平台起始日 ${slashDate(PLATFORM_START)} 的 ${s.beforeStart} 件</span>`);
     const odd=[
       s.badStatus && `status 無法對應 ${s.badStatus} 件`,
       s.unmappedDept && `reporterDepartment 未對應 ${s.unmappedDept} 件`,
+      s.badOptType && `optType 無法對應 ${s.badOptType} 件`,
+      s.unmappedReferral && `醫療資源轉介代碼未對應 ${s.unmappedReferral} 筆`,
       s.dupId && `reportId 重複 ${s.dupId} 件`
     ].filter(Boolean);
     if(odd.length) parts.push(`<span class="rd-warn">${odd.join('、')}</span>`);
@@ -21685,35 +24377,42 @@ html body .dashboard #command .closure-v74-donut .closure-v74-donut-center stron
 
   /* err 為 null：以 file:// 開啟，還沒讀過資料，直接請使用者選檔 */
   function showError(err){
-    if(err) console.error('[real-data]',err);
+    if(err) console.error('[qa-data]',err);
     const el=document.getElementById('rdStatus');
     if(!el) return;
     const local=location.protocol==='file:';
-    const why=err
-      ? `資料載入失敗：${esc(err.message || err)}。`
-      : '以 file:// 直接開檔時，瀏覽器不允許網頁自動讀取同資料夾的 data.json。';
+    const why=err ? `資料載入失敗：${esc(err.message || err)}。` : '以 file:// 直接開檔時，瀏覽器不允許網頁自動讀取同資料夾的 data.json。';
     el.classList.add('rd-error');
     el.innerHTML=`<span>${why}</span>`
-      +`<label class="rd-pick">選擇 data.json<input type="file" accept=".json,application/json"></label>`
+      +`<label class="rd-pick">選擇 data.json${LOAD_PLATFORM ? '（可一併選 data-platform.json）' : ''}<input type="file" multiple accept=".json,.jsonc,application/json"></label>`
       +(local ? '<span>或改用本機伺服器開啟（例如 VS Code Live Server）。</span>' : '');
     el.querySelector('input').addEventListener('change',e=>{
       if(e.target.files.length) loadFromPicker(e.target.files).then(start).catch(showError);
     });
   }
 
-  function start(raw){
-    build(raw);
+  function start({ raw, platform, platformError }){
+    build(raw,platform,platformError);
     initDateInputs();
+    const monthSel=document.getElementById('commandCompareMonth');
+    if(monthSel){ compareState.month=Number(RD.asOf.slice(5,7)); monthSel.value=String(compareState.month); }
     Object.entries(PAGES).forEach(([page,cfg])=>{
       const [s,e]=presetRange(cfg.initial);
       setRange(page,s,e,cfg.initial==='all' ? null : cfg.initial);
     });
     renderClosure();
+    renderComparison();
+    renderUsage();
+    if(typeof renderAiScatter==='function') renderAiScatter();
     renderStatus();
     document.documentElement.classList.add('rd-ready');
   }
 
   Object.keys(PAGES).forEach(wirePage);
+  wireOutcome();
+  wireHospital();
+  wireSnq();
+  wireComparison();
   /* file:// 下 fetch 一定被擋（還會在 console 留一串 CORS 錯誤），直接改用手動選檔 */
   if(location.protocol==='file:') showError(null);
   else loadFromServer().then(start).catch(showError);
