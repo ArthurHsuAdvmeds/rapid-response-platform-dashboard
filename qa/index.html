@@ -13326,8 +13326,8 @@
     <div class="command-view-tabs" id="commandViewTabs" role="tablist" aria-label="指揮儀表板檢視">
       <button type="button" class="command-view-tab active" data-command-view="flow" role="tab" aria-selected="true">指揮板</button>
       <button type="button" class="command-view-tab" data-command-view="closure" role="tab" aria-selected="false">結案率</button>
-      <!-- 同期比較先隱藏（比照 prod：平台 2026/10/05 起才有資料，還沒有往年可比）。程式與 #commandComparisonView 都保留，恢復時拿掉這段註解即可 -->
-      <!-- <button type="button" class="command-view-tab" data-command-view="comparison" role="tab" aria-selected="false">同期比較</button> -->
+      <!-- 同期比較：三年欄位保留，比較期間整段早於平台起始日 2026/10/05 的年份標示「平台未啟用」（使用者 2026-11-11 決定，見 qa-data 的 comparePeriods()） -->
+      <button type="button" class="command-view-tab" data-command-view="comparison" role="tab" aria-selected="false">同期比較</button>
       <!-- 平台使用率先隱藏（使用者 2026-11-11 指示，與醫院內控指標一起）。#commandUsageView 與 renderUsage() 都保留，恢復時拿掉這段註解，並把 qa-data 的 SHOW_PLATFORM 改成 true -->
       <!-- <button type="button" class="command-view-tab" data-command-view="usage" role="tab" aria-selected="false">平台使用率</button> -->
     </div>
@@ -13682,7 +13682,7 @@
         </div>
         <div class="command-compare-range">
           <strong id="commandCompareRangeTitle">同期累計｜1/1－9/25</strong>
-          <span>比較近三年相同期間</span>
+          <span id="commandCompareRangeNote">比較近三年相同期間</span>
         </div>
       </div>
 
@@ -22863,6 +22863,11 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
   html body .dashboard #efficiency .eff-v79-flow-seg>span{ top:24px; line-height:1; white-space:nowrap; }
 }
 
+/* 指揮儀表板同期比較：比較期間整段早於平台起始日 2026/10/05 的年份（欄位保留、數字「—」） */
+#command .cmp-table thead th.cmp-disabled,
+#command .cmp-table thead th.cmp-disabled small{ color:#b4bcc7; }
+#command .cmp-table .cmp-val.cmp-disabled{ background:#f8f9fb; }
+
 /* SNQ／平台使用率：data-platform.json 沒有載入時的說明 */
 .qa-platform-missing{ margin:8px 0 0; color:#98a2b3; font-size:12px; }
 
@@ -22940,7 +22945,7 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
      平台起始日固定 2026/10/05（PLATFORM_START）：日期最早可選這天，早於這天的通報不列入。
    ・地圖模組（主腳本 geoCases()）透過 window.RD.basicCases() 取基本資料頁目前區間的案件；
      AI 頁（目前隱藏）的 buildAiPairs()／getAiHistoryRows() 讀 RD.aiPairs()／RD.aiHistory()。
-   ・指揮儀表板「同期比較」先隱藏（比照 prod），renderComparison() 照常執行，恢復按鈕即可使用。
+   ・指揮儀表板「同期比較」：三年欄位保留，期間整段早於 PLATFORM_START 的年份標示「平台未啟用」（使用者 2026-11-11 決定），見 comparePeriods()。
    ========================================================================= */
 (()=>{
   'use strict';
@@ -24185,17 +24190,26 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
   const compareState={ mode:'ytd', month:null, type:'all' };
   const lastDayOf=(y,m)=>new Date(Date.UTC(y,m,0)).getUTCDate();
 
-  /* 三個年度各自的比較期間：同期累計＝1/1～asOf 的月日；同月＝本月 1 日～asOf 的日；其他月份＝整月（本月則到 asOf 的日，未來的月份本年度沒有資料） */
+  /* 三個年度各自的比較期間：同期累計＝1/1～asOf 的月日；同月＝本月 1 日～asOf 的日；其他月份＝整月（本月則到 asOf 的日，未來的月份本年度沒有資料）。
+     平台 2026/10/05 才啟用（PLATFORM_START）：期間整段在這天以前＝disabled（欄位保留，標示「平台未啟用」、數字「—」）；
+     跨過這天＝partial（照算，資料只有這天以後的，欄位標示「10/5 起」） */
   function comparePeriods(){
     const [Y,M,D]=RD.asOf.split('-').map(Number);
     const mode=compareState.mode, month=compareState.month ?? M;
-    return [Y-2,Y-1,Y].map(y=>{
+    const span=y=>{
       const cap=m=>pad(Math.min(D,lastDayOf(y,m)));
       if(mode==='ytd') return { year:y, start:`${y}-01-01`, end:`${y}-${pad(M)}-${cap(M)}` };
       if(mode==='month') return { year:y, start:`${y}-${pad(M)}-01`, end:`${y}-${pad(M)}-${cap(M)}` };
       if(month>M && y===Y) return { year:y, future:true };
       const end=month===M ? cap(month) : pad(lastDayOf(y,month));
       return { year:y, start:`${y}-${pad(month)}-01`, end:`${y}-${pad(month)}-${end}` };
+    };
+    return [Y-2,Y-1,Y].map(y=>{
+      const p=span(y);
+      if(p.future) return p;
+      if(p.end<PLATFORM_START) p.disabled=true;
+      else if(p.start<PLATFORM_START) p.partial=true;
+      return p;
     });
   }
 
@@ -24208,11 +24222,24 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
     const title=mode==='ytd' ? `同期累計｜1/1－${M}/${D}` : mode==='month' ? `同月比較｜${M}/1－${M}/${D}`
       : `其他月份比較｜${month} 月${month===M ? `（1–${D} 日）` : ''}`;
     setText('commandCompareRangeTitle',title);
-    const values=periods.map(p=>p.future ? null : effMetrics(byType(casesIn(p.start,p.end),compareState.type)).values);
+    const startText=slashDate(PLATFORM_START);
+    const startMD=`${Number(PLATFORM_START.slice(5,7))}/${Number(PLATFORM_START.slice(8,10))}`;
+    setText('commandCompareRangeNote',periods.some(p=>p.disabled || p.partial)
+      ? `比較近三年相同期間・平台 ${startText} 啟用，之前沒有資料` : '比較近三年相同期間');
+    const values=periods.map(p=>p.future || p.disabled ? null : effMetrics(byType(casesIn(p.start,p.end),compareState.type)).values);
     const isRate=row=>row.unit==='%';
-    const currentNote=periods[2].future ? '尚未發生' : (mode==='customMonth' && month<M ? '整月' : `截至 ${M}/${D}`);
+    const toDate=mode==='customMonth' && month<M ? null : `${M}/${D}`;   /* 本年度的期間到哪天；null＝整月 */
+    const yearNote=(p,i)=>{
+      if(p.future) return '尚未發生';
+      if(p.disabled) return '平台未啟用';
+      if(p.partial) return i===2 && toDate ? `${startMD}－${toDate}` : `${startMD} 起`;
+      if(i===2) return toDate ? `截至 ${toDate}` : '整月';
+      return `民國${p.year-1911}年`;
+    };
+    const yearTip=p=>p.disabled ? ` title="平台 ${startText} 啟用，這段期間沒有資料"`
+      : p.partial ? ` title="平台 ${startText} 啟用，只計算這天以後的資料"` : '';
     const head=`<thead><tr><th class="cmp-name">指標</th>`
-      +periods.map((p,i)=>`<th class="cmp-year${i===2?' current':''}">${p.year}<small>${i===2 ? currentNote : `民國${p.year-1911}年`}</small></th>`).join('')
+      +periods.map((p,i)=>`<th class="cmp-year${i===2?' current':''}${p.disabled?' cmp-disabled':''}"${yearTip(p)}>${p.year}<small>${yearNote(p,i)}</small></th>`).join('')
       +`<th class="cmp-change-head">較去年</th></tr></thead>`;
     const changeCell=(row,prev,cur)=>{
       if(prev==null || cur==null) return '<td class="cmp-change none">—</td>';
@@ -24229,7 +24256,7 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
       const rows=g.rows.map(row=>{
         const vals=values.map(v=>v ? (v[row.key] ?? null) : null);
         const max=Math.max(...vals.filter(v=>v!=null),.0001);
-        const cells=vals.map((v,i)=>`<td class="cmp-val${i===2?' current':''}${v==null?' no-data':''}">`
+        const cells=vals.map((v,i)=>`<td class="cmp-val${i===2?' current':''}${v==null?' no-data':''}${periods[i].disabled?' cmp-disabled':''}">`
           +`<span><b>${fmt1(v)}</b>${v==null ? '' : `<em>${row.unit}</em>`}</span>`
           +`<i class="cmp-bar"><i style="width:${v==null ? 0 : (v/max*100).toFixed(1)}%"></i></i></td>`).join('');
         return `<tr><th class="cmp-name" scope="row">${row.name}</th>${cells}${changeCell(row,vals[1],vals[2])}</tr>`;

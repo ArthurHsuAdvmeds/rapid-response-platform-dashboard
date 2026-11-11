@@ -20,7 +20,7 @@
 | --- | --- | --- | --- |
 | `index.html` | 轉址到 `prod/` | ✓ | — |
 | `prod/` | 正式版：`index.html`（以原型 v7 為基礎，只保留緊急醫療，數字由資料即時計算）＋ `data.json`（排程主機定期 push） | ✓ | [prod/CLAUDE.md](prod/CLAUDE.md)、[prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md) |
-| `qa/` | 驗證版：`index.html`（原型 v9 全部頁面接資料，AI 頁、醫院內控指標、指揮儀表板的同期比較與平台使用率先隱藏，平台起始日固定 2026/10/05）＋ `data.json`（schemaVersion 2）＋ `data-platform.json`（SNQ、平台使用率；兩處隱藏期間不讀）；目前兩個資料檔是虛構範例；另有兩個資料範本 `*.template.jsonc` | ✓ | [qa/CLAUDE.md](qa/CLAUDE.md)、[qa/DATA_CONTRACT.md](qa/DATA_CONTRACT.md) |
+| `qa/` | 驗證版：`index.html`（原型 v9 全部頁面接資料，AI 頁、醫院內控指標、指揮儀表板的平台使用率先隱藏，平台起始日固定 2026/10/05，同期比較中起始日以前的年份標示未啟用）＋ `data.json`（schemaVersion 2）＋ `data-platform.json`（SNQ、平台使用率；兩處隱藏期間不讀）；目前兩個資料檔是虛構範例；另有兩個資料範本 `*.template.jsonc` | ✓ | [qa/CLAUDE.md](qa/CLAUDE.md)、[qa/DATA_CONTRACT.md](qa/DATA_CONTRACT.md) |
 | `prototype/` | `v1/`–`v9/` 原型（最新 `v9/`）、`release-note/`、轉址頁 `index.html` | ✓ | [prototype/CLAUDE.md](prototype/CLAUDE.md) |
 | `V9調整.md` | 客戶對 v9「醫療機構端處理成效分析」的調整清單（v9 的需求來源） | 使用者決定 | — |
 | `.tool/` | 本機工具：`qa_sample_data.py` 產生 qa 的虛構範例資料；也放驗證腳本與截圖 | ✗（`.gitignore`） | — |
