@@ -1,7 +1,7 @@
 # rapid-response-platform-dashboard
 
 三軍總醫院北投分院「精神健康個案通報管理儀表板」。2026-11 從 advmeds-prototype 的 `tsghb-dashboard/` 獨立出來：
-`prod/` 是接平台真實資料的正式版，`qa/` 是 V9 版面接資料的驗證版（驗證過再更新到 prod），`prototype/` 是 v1–v9 原型（模擬資料）。
+`prod/` 是接平台真實資料的正式版，`qa/` 是 V9 版面接資料的驗證版（驗證過再更新到 prod），`prototype/` 是 v1–v10 原型（模擬資料）。
 
 全部是靜態檔，push 到 `main` 後由 GitHub Actions（`.github/workflows/pages.yml`）把整個 repo 原樣部署到 GitHub Pages，**沒有 build、套件管理或測試流程**。
 
@@ -21,10 +21,10 @@
 | `index.html` | 轉址到 `prod/` | ✓ | — |
 | `prod/` | 正式版：`index.html`（2026-11-11 由 qa 同步，原型 v9 全部頁面接資料；AI 頁、醫院內控指標、平台使用率隱藏中）＋ `data.json`（schemaVersion 2，平台專案定期 push）＋ `data.template.jsonc`；不用 `data-platform.json` | ✓ | [prod/CLAUDE.md](prod/CLAUDE.md)、[prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md) |
 | `qa/` | 驗證版：`index.html`（原型 v9 全部頁面接資料，AI 頁、醫院內控指標、指揮儀表板的平台使用率先隱藏，平台起始日固定 2026/10/05，同期比較中起始日以前的年份標示未啟用）＋ `data.json`（schemaVersion 2）＋ `data-platform.json`（SNQ、平台使用率、AI 預測；三處隱藏期間不讀）；`data.json` 2026-11-11 起是平台的正式資料，`data-platform.json` 還是虛構範例；另有兩個資料範本 `*.template.jsonc` | ✓ | [qa/CLAUDE.md](qa/CLAUDE.md)、[qa/DATA_CONTRACT.md](qa/DATA_CONTRACT.md) |
-| `prototype/` | `v1/`–`v9/` 原型（最新 `v9/`）、`release-note/`、轉址頁 `index.html` | ✓ | [prototype/CLAUDE.md](prototype/CLAUDE.md) |
+| `prototype/` | `v1/`–`v10/` 原型（最新 `v10/`）、`release-note/`、轉址頁 `index.html` | ✓ | [prototype/CLAUDE.md](prototype/CLAUDE.md) |
 | `V9調整.md` | 客戶對 v9「醫療機構端處理成效分析」的調整清單（v9 的需求來源） | 使用者決定 | — |
 | `.tool/` | 本機工具：`qa_sample_data.py` 產生 qa 的虛構範例資料；也放驗證腳本與截圖 | ✗（`.gitignore`） | — |
-| `kpi/` | `kpi.csv` 指標清單、`original_list.xlsx` 客戶原始清單。**只留本機**，不要 `git add -f` | ✗（`.gitignore`） | 第 6 節 |
+| `kpi/` | `kpi.csv` 指標清單、`original_list.xlsx` 客戶原始清單、`training_que.xlsx` 教育訓練課後問卷（含填答者姓名，v10 的需求來源）。**只留本機**，不要 `git add -f` | ✗（`.gitignore`） | 第 6 節 |
 | `.github/workflows/pages.yml` | Pages 部署 | ✓ | **不要改**，除非使用者明確要求 |
 
 **動手前先讀該資料夾的 CLAUDE.md。** advmeds-prototype 的資料庫規劃 `tsghb-dashboard/db_desc/` 沒有搬過來，需要時到那個 repo 看。
@@ -98,7 +98,7 @@
 
 ## 6. 指標清單 `kpi/`（只在使用者本機）
 
-- `kpi.csv` 依 v6 畫面整理，150–153 是 v8 新增的平台使用率。UTF-8 含 BOM、CRLF（給 Excel 直接開）；檔尾有一列 `,,,,,` 空白列，新增的列插在它前面。
+- `kpi.csv` 依 v6 畫面整理，150–153 是 v8 新增的平台使用率，154–159 是 v9，160–174 是 v10 的平台導入成效分析。UTF-8 含 BOM、CRLF（給 Excel 直接開）；檔尾有一列 `,,,,,` 空白列，新增的列插在它前面。
 - 欄位：項次、主分頁、次分頁、指標名稱、圖表種類、重複項次、計算公式、是否依賴HIS資料。
 - 「計算公式」以客戶原始清單 `original_list.xlsx` 為準，清單沒有的才依儀表板定義補。
   句尾【原清單無】＝儀表板有、原清單沒有；【差異】＝兩邊定義不一致，兩種都要跟客戶確認。xlsx 可用 Python 標準庫 `zipfile` 讀 `xl/sharedStrings.xml`。

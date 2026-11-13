@@ -301,7 +301,8 @@ footer{
     </p>
 
     <nav class="entries" aria-label="版本入口">
-      <a class="entry current" href="../v9/index.html"><b>V9</b><span>2026-11-09｜目前版本</span></a>
+      <a class="entry current" href="../v10/index.html"><b>V10</b><span>2026-11-12｜目前版本</span></a>
+      <a class="entry" href="../v9/index.html"><b>V9</b><span>2026-11-09</span></a>
       <a class="entry" href="../v8/index.html"><b>V8</b><span>2026-11-05</span></a>
       <a class="entry" href="../v7/index.html"><b>V7</b><span>2026-10-16</span></a>
       <a class="entry" href="../v6/index.html"><b>V6</b><span>2026-09-29</span></a>
@@ -321,6 +322,144 @@ footer{
     深色標籤是頁首下方主選單的頁面名稱，橘色標籤是頁面內的子頁籤或按鈕，灰色標籤是卡片或區塊名稱。
     依序點下去就會看到該項變更。
   </div>
+
+  <!-- ===================== V10 ===================== -->
+  <section class="release" id="v10">
+    <div class="release-head">
+      <h2 class="release-ver">V10</h2>
+      <span class="release-date">2026-11-12</span>
+      <span class="release-vs">相較 V9</span>
+    </div>
+    <p class="release-summary">
+      依教育訓練課後問卷新增主頁「平台導入成效分析」，放在主選單倒數第二項（指揮儀表板前），分三個子頁籤：
+      教育訓練滿意度（指標清單的「教育訓練課程滿意度」，依場次）、預期效益與推廣挑戰、啟用前後比較（問卷中平台啟用前的處理時效與滿意度，對照平台上的緊急醫療案件）。
+      題目與選項照實際問卷，畫面數字為原型模擬資料；其餘各頁內容與資料均未更動。
+    </p>
+
+    <div class="group">
+      <h3 class="group-title">平台導入成效分析（新頁面）</h3>
+      <ul class="items">
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">1</span>
+            <h3>新增主頁「平台導入成效分析」<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            主選單在「指揮儀表板」前新增一頁（桌機主選單由 9 欄改為 10 欄，手機的頁面下拉選單也多一項）。
+            頁面上方是日期與「單位分析」兩個篩選，三個子頁籤共用。
+          </p>
+          <div class="detail">
+            <ul>
+              <li><b>日期</b>：問卷以場次日期、平台資料以通報日篩選；本月／本季／本年度三個快速鍵</li>
+              <li><b>單位分析</b>：全部／衛政／社政／消防／其他（問卷的就職單位選項）；平台資料依通報者所屬網絡，衛政、社政、消防照名稱對應，其餘網絡算「其他」</li>
+              <li>每張卡片右上角「指標定義」說明算法；長條與色塊可用滑鼠或鍵盤查看人數</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">平台導入成效分析</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">2</span>
+            <h3>教育訓練滿意度（依場次）<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            上方四張數值卡：教育訓練場次、填答人數、總滿意度、滿意占比；下方是各場次總滿意度（依日期排列）、各題平均分、各單位總滿意度。
+          </p>
+          <div class="detail">
+            <ul>
+              <li><b>場次</b>：依問卷填答時間，同一天的上午、下午各算一場（正式場次清單整理中，見待確認事項第 1 項）</li>
+              <li><b>總滿意度</b>：四題 1–5 分（系統介面設計、系統功能符合實務需求、課程內容講師與教材、系統操作流程）全部作答的平均，對應指標清單「教育訓練課程滿意度：所有填答總分數之平均分（依場次）」</li>
+              <li><b>滿意占比</b>：給 4、5 分的作答占全部作答（四題合計）</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">平台導入成效分析</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">教育訓練滿意度</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">3</span>
+            <h3>預期效益與推廣挑戰<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            四題平台使用預期效益的同意程度（以「普通」的中點為中線，右側同意、左側不同意）、推廣可能面臨的挑戰（複選），以及自由填寫建議的歸類人數。
+          </p>
+          <div class="detail">
+            <ul>
+              <li><b>同意以上</b>：非常同意＋同意的人數占填答人數</li>
+              <li><b>推廣挑戰</b>：複選，各選項的勾選人數 ÷ 填答人數，合計會超過 100%</li>
+              <li><b>建議意見</b>：只顯示歸類後的人數，不顯示原文（原文可能認得出填答者）</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">平台導入成效分析</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">預期效益與推廣挑戰</span>
+          </div>
+        </li>
+
+        <li class="item">
+          <div class="item-head">
+            <span class="item-no">4</span>
+            <h3>啟用前後比較<span class="tag new">新增</span></h3>
+          </div>
+          <p>
+            問卷中「平台啟用前」的處理時效，對照平台上緊急醫療案件的實際時間，用同一組區間比較；另外列出啟用前通報後能否得知處遇結果，以及轉介滿意度的前後對照。
+          </p>
+          <div class="detail">
+            <ul>
+              <li><b>通報 → 得知受理</b>：平台以「完成指派醫師／護理師」的時間對照</li>
+              <li><b>通報 → 得知處理方式</b>（電訪或決定出勤日）：平台以「首次完成受理方式表單」的時間對照</li>
+              <li><b>通報 → 醫師出勤</b>：平台以「實際出勤時間」對照，只算出勤的案件</li>
+              <li><b>區間</b>：24 小時內／1–3 天／4–7 天／8–10 天／11 天以上；問卷另有「無法得知」</li>
+              <li><b>範圍</b>：啟用前只算回答「曾經轉介」的填答者，不受日期篩選；轉介滿意度的平台端是「通報者基本資料分析」的平台使用者滿意度調查分數</li>
+            </ul>
+          </div>
+          <div class="path">
+            <span class="path-label">點選路徑</span>
+            <span class="crumb nav">平台導入成效分析</span>
+            <span class="sep">›</span>
+            <span class="crumb tab">啟用前後比較</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="open-questions">
+      <h3>待確認事項</h3>
+      <ol>
+        <li>
+          <b>場次清單。</b>
+          目前依問卷填答日期＋上午／下午分場次；正式場次清單（日期、時段、對象）整理中，拿到後改依清單分場。
+        </li>
+        <li>
+          <b>問卷有三題沒有回答。</b>
+          「參與完本次課程對我在熟悉平台使用上是有幫助的」「平台對於跨網絡的資訊整合及協同效率的幫助程度」「系統分級權限控管明確，能讓傳輸敏感個案資料時更加安心」在目前的回覆中都是空白，畫面暫不列入；請確認表單設定。
+        </li>
+        <li>
+          <b>啟用前的題目只有部分場次有。</b>
+          這幾題是後來才加入表單，較早的場次沒有；另外回答「不曾轉介」的人仍會看到後續題目（跳題沒有生效），畫面只算「曾經轉介」的填答者。
+        </li>
+        <li>
+          <b>疑似看反量表方向的問卷。</b>
+          有問卷四題滿意度都給 1 分、預期效益卻全部「非常同意」，是否排除？
+        </li>
+        <li>
+          <b>建議意見的歸類。</b>
+          自由填寫的建議由誰、依哪些主題歸類（原型暫分：教學影片／操作手冊／QA、系統介接、字體與畫面、上傳同意書、權限與資安、其他）。
+        </li>
+      </ol>
+    </div>
+  </section>
 
   <!-- ===================== V9 ===================== -->
   <section class="release" id="v9">
