@@ -13399,7 +13399,7 @@
       <div class="adoption-v10-grid is-three">
         <article class="adoption-v10-card adoption-v10-main">
           <header class="adoption-v10-card-head">
-            <div><h3>平台使用預期效益</h3><p>各題同意程度的人數占比｜中線右側為同意</p></div>
+            <div><h3>平台使用預期效益</h3><p>各題同意程度的人數占比｜每列合計 100%</p></div>
             <button type="button" class="adoption-v10-info" data-adoption-info="benefit">指標定義</button>
           </header>
           <div class="adoption-v10-legend" id="adoptionLikertLegend"></div>
@@ -25876,9 +25876,8 @@ html body .dashboard #adoption .adoption-v10-legend{ display:flex; flex-wrap:wra
 html body .dashboard #adoption .adoption-v10-legend-item{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
 html body .dashboard #adoption .adoption-v10-legend-item i{ width:12px; height:12px; border-radius:3px; flex:0 0 auto; }
 
-/* ---------- 堆疊橫條（色塊之間 2px 白色間隔） ---------- */
-html body .dashboard #adoption .adoption-v10-stack,
-html body .dashboard #adoption .adoption-v10-diverge{
+/* ---------- 100% 堆疊橫條（色塊之間 2px 白色間隔；同意程度與處理時效共用，各列等長） ---------- */
+html body .dashboard #adoption .adoption-v10-stack{
   position:relative;
   display:flex;
   align-items:stretch;
@@ -25892,8 +25891,9 @@ html body .dashboard #adoption .adoption-v10-seg{
   display:flex;
   align-items:center;
   justify-content:center;
-  flex:0 0 auto;
-  min-width:0;
+  /* 只有 1 人的色塊扣掉 2px 間隔會看不見：至少 4px，多出來的由其他色塊依比例縮回，總長不變 */
+  flex:0 1 auto;
+  min-width:4px;
   box-shadow:inset -2px 0 0 #fff;
   cursor:default;
 }
@@ -25901,9 +25901,6 @@ html body .dashboard #adoption .adoption-v10-seg:last-child{ box-shadow:none; }
 html body .dashboard #adoption .adoption-v10-seg:hover{ filter:brightness(1.06); }
 html body .dashboard #adoption .adoption-v10-seg em{ font-style:normal; font-size:12px; font-weight:800; line-height:1; white-space:nowrap; padding-right:2px; }
 html body .dashboard #adoption .adoption-v10-seg em[hidden]{ display:none; }
-html body .dashboard #adoption .adoption-v10-spacer{ flex:0 0 auto; }
-html body .dashboard #adoption .adoption-v10-center{ position:absolute; top:-3px; bottom:-3px; width:1px; background:#5b6676; pointer-events:none; }
-html body .dashboard #adoption .adoption-v10-diverge{ overflow:visible; border-radius:0; }
 
 /* 同意程度 */
 html body .dashboard #adoption .adoption-v10-likert{ display:flex; flex-direction:column; justify-content:space-evenly; gap:10px; flex:1 1 auto; min-height:0; }
@@ -26028,7 +26025,7 @@ dialog.adoption-v10-dialog{ width:min(720px,calc(100vw - 32px)); }
     row-gap:6px;
   }
   html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-likert-row .adoption-v10-row-name{ grid-area:name; }
-  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-likert-row .adoption-v10-diverge{ grid-area:bar; }
+  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-likert-row .adoption-v10-stack{ grid-area:bar; }
   html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-likert-row .adoption-v10-row-value{ grid-area:value; }
 }
 /* 矮視窗（1536×730、1366×657、1280×720 這類）：卡片標題與說明同一行、列距縮小 */
@@ -26083,7 +26080,7 @@ dialog.adoption-v10-dialog{ width:min(720px,calc(100vw - 32px)); }
   html body .dashboard #adoption .adoption-v10-row .adoption-v10-row-value{ grid-area:value; }
   html body .dashboard #adoption .adoption-v10-likert-row{ grid-template-columns:minmax(0,1fr) 5em; grid-template-areas:"name value" "bar bar"; row-gap:6px; }
   html body .dashboard #adoption .adoption-v10-likert-row .adoption-v10-row-name{ grid-area:name; }
-  html body .dashboard #adoption .adoption-v10-likert-row .adoption-v10-diverge{ grid-area:bar; }
+  html body .dashboard #adoption .adoption-v10-likert-row .adoption-v10-stack{ grid-area:bar; }
   html body .dashboard #adoption .adoption-v10-likert-row .adoption-v10-row-value{ grid-area:value; }
   html body .dashboard #adoption .adoption-v10-stack-row{ grid-template-columns:minmax(0,1fr); gap:4px; }
   html body .dashboard #adoption .adoption-v10-timing-group > header em{ margin-left:0; }
@@ -26404,39 +26401,19 @@ dialog.adoption-v10-dialog{ width:min(720px,calc(100vw - 32px)); }
     const likertBox=$('#adoptionLikert');
     if(!n) empty(likertBox,'此區間沒有問卷資料');
     else{
-      const rows=BENEFITS.map(b=>{
-        const share=Object.fromEntries(LIKERT.map(l=>[l.key,rs.filter(r=>r.benefit[b.key]===l.key).length/n]));
-        const left=share.sd+share.d+share.n/2;
-        const right=share.n/2+share.a+share.sa;
-        return {b,share,left,right};
-      });
-      /* 以「普通」的中點為中線；左右延伸量取各題最大值，所有題目共用同一條中線 */
-      const maxLeft=Math.max(0.04,...rows.map(r=>r.left));
-      const maxRight=Math.max(...rows.map(r=>r.right));
-      const total=maxLeft+maxRight;
-      likertBox.replaceChildren(...rows.map(({b,share,left})=>{
+      /* 100% 堆疊橫條（2026-11-13 由發散式改來，不要中線）：每題一列，由左到右非常不同意→非常同意，
+         分母是該題作答人數，每列合計 100%，所以各列等長、兩端對齊 */
+      likertBox.replaceChildren(...BENEFITS.flatMap(b=>{
+        const counts=Object.fromEntries(LIKERT.map(l=>[l.key,rs.filter(r=>r.benefit[b.key]===l.key).length]));
+        const answered=LIKERT.reduce((s,l)=>s+counts[l.key],0);
+        if(!answered) return [];
         const row=el('div','adoption-v10-likert-row');
         const name=el('span','adoption-v10-row-name',b.label);
-        const track=el('div','adoption-v10-diverge');
-        const center=el('i','adoption-v10-center');
-        center.style.left=`${(maxLeft/total*100).toFixed(3)}%`;
-        const spacer=el('span','adoption-v10-spacer');
-        spacer.style.width=`${((maxLeft-left)/total*100).toFixed(3)}%`;
-        const stack=stackBar(LIKERT.map(l=>({label:l.label,share:share[l.key]*(1/total),color:l.color,ink:l.ink,count:Math.round(share[l.key]*n)})),b.full,'人');
-        /* stackBar 的寬度以 total 縮放過；色塊上的百分比要寫回原本的占比 */
-        [...stack.children].forEach((seg,i)=>{
-          const l=LIKERT.filter(x=>share[x.key]>0)[i];
-          seg.querySelector('em').textContent=fmtPct0(share[l.key]*100);
-          const info=tipData.get(seg);
-          info.rows[0][0]=fmtPct(share[l.key]*100);
-          seg.setAttribute('aria-label',[info.title,...info.rows.map(([v,lb])=>`${lb} ${v}`)].join('，'));
-        });
-        track.append(spacer,...stack.children,center);
-        const agree=(share.a+share.sa)*100;
-        const val=el('b','adoption-v10-row-value',fmtPct(agree));
+        const bar=stackBar(LIKERT.map(l=>({label:l.label,share:counts[l.key]/answered,color:l.color,ink:l.ink,count:counts[l.key]})),b.full,'人');
+        const val=el('b','adoption-v10-row-value',fmtPct((counts.a+counts.sa)/answered*100));
         val.append(el('small',null,'同意以上'));
-        row.append(name,track,val);
-        return row;
+        row.append(name,bar,val);
+        return [row];
       }));
     }
 
@@ -26628,7 +26605,7 @@ dialog.adoption-v10-dialog{ width:min(720px,calc(100vw - 32px)); }
     ]},
     items:{title:'各題平均分',rows:[...ITEMS.map(it=>[it.label,`「${it.full}」1–5 分的平均。`]),['篩選','日期以場次日期為準；單位是填答者的就職單位。']]},
     units:{title:'各單位總滿意度',rows:[['算法','依填答者的就職單位（衛政、社政、消防、其他）分組，各自計算總滿意度（四題全部作答的平均）。']]},
-    benefit:{title:'平台使用預期效益',rows:[...BENEFITS.map(b=>[b.label,`「${b.full}」`]),['算法','各同意程度的人數 ÷ 填答人數；同意以上＝非常同意＋同意。圖以「普通」的中點為中線，右側是同意、左側是不同意。']]},
+    benefit:{title:'平台使用預期效益',rows:[...BENEFITS.map(b=>[b.label,`「${b.full}」`]),['算法','各同意程度的人數 ÷ 該題作答人數，每列合計 100%；同意以上＝非常同意＋同意。長條由左到右是非常不同意到非常同意。']]},
     challenges:{title:'推廣可能面臨的挑戰',rows:[['題目','「您認為未來在單位推廣或使用本系統時，可能面臨的最大挑戰是什麼？」（複選）'],['算法','各選項的勾選人數 ÷ 填答人數；一人可勾多項，合計會超過 100%。「其他」是自由填寫的內容，填「無」「目前還不知道」這類的算「無／尚無法判斷」。']]},
     suggestions:{title:'建議意見歸類',rows:[['題目','「針對系統介面優化、操作流程改善，或未來補充教材（如教學影片／操作手冊），您有什麼建議？」'],['算法','自由填寫的內容依主題歸類後的人數 ÷ 填答人數；填「無」「暫無」的不列入。只顯示歸類後的人數，不顯示原文（原文可能指認到填答者）。']]},
     timing:{title:'處理時效：啟用前 vs 平台',rows:[
