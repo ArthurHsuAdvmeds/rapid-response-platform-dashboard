@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>三軍總醫院北投分院｜精神健康個案通報管理儀表板｜QA</title>
 <meta name="robots" content="noindex, nofollow">
-<!-- qa：V9 版面接真實資料（驗證用，驗證後再更新到 prod）。數字由同資料夾的 data.json 與 data-platform.json 計算（後者供醫院內控指標、平台使用率、AI 頁，三處目前都隱藏、不讀，見 SHOW_PLATFORM／SHOW_AI），見檔尾 <style id="qa-data">／<script id="qa-data"> 與 DATA_CONTRACT.md -->
+<!-- qa：V9 版面接真實資料（驗證用，驗證後再更新到 prod）。數字由同資料夾的 data.json 與 data-platform.json 計算（後者供醫院內控指標、平台使用率、AI 頁，三處目前都隱藏、不讀，見 SHOW_PLATFORM／SHOW_AI）；原型 v10 新增的「平台導入成效分析」另讀 data-que.json（教育訓練課後問卷）。見檔尾 <style id="qa-data">／<script id="qa-data">／<script id="qa-adoption"> 與 DATA_CONTRACT.md -->
 <style>
   :root{
     --blue:#40a5f3;
@@ -12099,6 +12099,8 @@
     <!-- qa：醫院內控指標先隱藏（使用者 2026-11-11 指示，與平台使用率一起，兩者與 AI 頁都讀 data-platform.json）；
          要恢復就把下一行還原成按鈕、拿掉 #snq 的 hidden，並把 qa-data 的 SHOW_PLATFORM 改成 true -->
     <!-- <button class="tab" data-page="snq">醫院內控指標(SNQ)</button> -->
+    <!-- qa：原型 v10 新增的頁（資料：data-que.json＋data.json，程式在檔尾 qa-adoption） -->
+    <button class="tab" data-page="adoption">平台導入成效分析</button>
     <button class="tab" data-page="command">指揮儀表板</button>
   </nav>
 
@@ -13322,6 +13324,158 @@
     </dialog>
   </section>
 
+  <!-- v10：平台導入成效分析（教育訓練課後問卷＋平台啟用前後比較）。qa：由 data-que.json 與 data.json 計算，程式在檔尾 qa-adoption -->
+  <section class="page" id="adoption">
+    <div class="outcome-v62-toolbar adoption-v10-toolbar">
+      <div class="outcome-v62-tabs adoption-v10-tabs" id="adoptionViewTabs" role="tablist" aria-label="平台導入成效分析檢視">
+        <button type="button" class="outcome-v62-tab active" data-adoption-view="training" role="tab" aria-selected="true" aria-controls="adoptionTrainingPanel">教育訓練滿意度</button>
+        <button type="button" class="outcome-v62-tab" data-adoption-view="benefit" role="tab" aria-selected="false" aria-controls="adoptionBenefitPanel">預期效益與推廣挑戰</button>
+        <button type="button" class="outcome-v62-tab" data-adoption-view="compare" role="tab" aria-selected="false" aria-controls="adoptionComparePanel">啟用前後比較</button>
+      </div>
+    </div>
+
+    <div class="command-filter-card page-time-filter adoption-time-filter" id="adoptionTimeFilter">
+      <div class="command-date-filter">
+        <label>
+          <span>開始日期</span>
+          <input type="date" id="adoptionStartDate" value="2026-01-01" min="2026-01-01" max="2026-09-25">
+        </label>
+        <span class="command-date-arrow">→</span>
+        <label>
+          <span>結束日期</span>
+          <input type="date" id="adoptionEndDate" value="2026-09-25" min="2026-01-01" max="2026-09-25">
+        </label>
+        <button type="button" class="command-apply-btn" id="adoptionApplyRange">套用</button>
+      </div>
+      <div class="command-quick-filter" id="adoptionQuickFilter">
+        <button type="button" data-adoption-range="month">本月</button>
+        <button type="button" data-adoption-range="quarter">本季</button>
+        <button type="button" class="active" data-adoption-range="year">本年度</button>
+      </div>
+    </div>
+
+    <div class="analysis-filter-row adoption-filter-row">
+      <div class="analysis-filter-label">單位分析</div>
+      <div class="risk-filter" id="adoptionUnitFilter" aria-label="單位篩選">
+        <button type="button" class="risk-filter-btn active" data-adoption-unit="all">全部</button>
+        <button type="button" class="risk-filter-btn" data-adoption-unit="衛政">衛政</button>
+        <button type="button" class="risk-filter-btn" data-adoption-unit="社政">社政</button>
+        <button type="button" class="risk-filter-btn" data-adoption-unit="消防">消防</button>
+        <button type="button" class="risk-filter-btn" data-adoption-unit="其他">其他</button>
+      </div>
+      <p class="adoption-v10-scope" id="adoptionScope" aria-live="polite"></p>
+    </div>
+
+    <!-- 子頁籤 1：教育訓練滿意度（原清單「教育訓練課程滿意度：所有填答總分數之平均分（依場次）」） -->
+    <div class="adoption-v10-panel active" id="adoptionTrainingPanel" data-adoption-panel="training" role="tabpanel">
+      <div class="adoption-v10-kpis">
+        <article class="adoption-v10-kpi">
+          <span>教育訓練場次</span>
+          <strong id="adoptionKpiSessions">—</strong>
+          <small>依場次清單（日期＋上午／下午）</small>
+        </article>
+        <article class="adoption-v10-kpi">
+          <span>填答人數</span>
+          <strong id="adoptionKpiResponses">—</strong>
+          <small>課後問卷份數</small>
+        </article>
+        <article class="adoption-v10-kpi">
+          <span>總滿意度</span>
+          <strong id="adoptionKpiScore">—</strong>
+          <small>四題 1–5 分全部平均</small>
+        </article>
+        <article class="adoption-v10-kpi">
+          <span>滿意占比</span>
+          <strong id="adoptionKpiTop">—</strong>
+          <small>給 4–5 分的作答占全部作答</small>
+        </article>
+      </div>
+      <div class="adoption-v10-grid">
+        <article class="adoption-v10-card adoption-v10-main">
+          <header class="adoption-v10-card-head">
+            <div><h3>各場次總滿意度</h3><p>依場次日期排列｜滿分 5 分</p></div>
+            <button type="button" class="adoption-v10-info" data-adoption-info="sessions">指標定義</button>
+          </header>
+          <div class="adoption-v10-list adoption-v10-scroll" id="adoptionSessionList"></div>
+        </article>
+        <article class="adoption-v10-card">
+          <header class="adoption-v10-card-head">
+            <div><h3>各題平均分</h3><p>滿分 5 分</p></div>
+            <button type="button" class="adoption-v10-info" data-adoption-info="items">指標定義</button>
+          </header>
+          <div class="adoption-v10-list" id="adoptionItemList"></div>
+        </article>
+        <article class="adoption-v10-card">
+          <header class="adoption-v10-card-head">
+            <div><h3>各單位總滿意度</h3><p>依填答者的就職單位</p></div>
+            <button type="button" class="adoption-v10-info" data-adoption-info="units">指標定義</button>
+          </header>
+          <div class="adoption-v10-list" id="adoptionUnitList"></div>
+        </article>
+      </div>
+    </div>
+
+    <!-- 子頁籤 2：預期效益與推廣挑戰 -->
+    <div class="adoption-v10-panel" id="adoptionBenefitPanel" data-adoption-panel="benefit" role="tabpanel" hidden>
+      <div class="adoption-v10-grid is-three">
+        <article class="adoption-v10-card adoption-v10-main">
+          <header class="adoption-v10-card-head">
+            <div><h3>平台使用預期效益</h3><p>各題同意程度的人數占比｜每列合計 100%</p></div>
+            <button type="button" class="adoption-v10-info" data-adoption-info="benefit">指標定義</button>
+          </header>
+          <div class="adoption-v10-legend" id="adoptionLikertLegend"></div>
+          <div class="adoption-v10-likert" id="adoptionLikert"></div>
+        </article>
+        <article class="adoption-v10-card">
+          <header class="adoption-v10-card-head">
+            <div><h3>推廣可能面臨的挑戰</h3><p>複選｜勾選人數占填答人數</p></div>
+            <button type="button" class="adoption-v10-info" data-adoption-info="challenges">指標定義</button>
+          </header>
+          <div class="adoption-v10-list" id="adoptionChallengeList"></div>
+        </article>
+        <article class="adoption-v10-card">
+          <header class="adoption-v10-card-head">
+            <div><h3>建議意見歸類</h3><p>自由填寫的建議依內容歸類，不顯示原文</p></div>
+            <button type="button" class="adoption-v10-info" data-adoption-info="suggestions">指標定義</button>
+          </header>
+          <div class="adoption-v10-list" id="adoptionSuggestionList"></div>
+          <p class="adoption-v10-note" id="adoptionSuggestionNote"></p>
+        </article>
+      </div>
+    </div>
+
+    <!-- 子頁籤 3：啟用前後比較（啟用前＝問卷「曾經轉介」者；平台＝緊急醫療案件） -->
+    <div class="adoption-v10-panel" id="adoptionComparePanel" data-adoption-panel="compare" role="tabpanel" hidden>
+      <div class="adoption-v10-grid">
+        <article class="adoption-v10-card adoption-v10-main">
+          <header class="adoption-v10-card-head">
+            <div><h3>處理時效：啟用前 vs 平台</h3><p id="adoptionTimingSub">啟用前＝問卷回答；平台＝緊急醫療案件的實際時間</p></div>
+            <button type="button" class="adoption-v10-info" data-adoption-info="timing">指標定義</button>
+          </header>
+          <div class="adoption-v10-legend" id="adoptionBucketLegend"></div>
+          <div class="adoption-v10-timing" id="adoptionTiming"></div>
+        </article>
+        <article class="adoption-v10-card">
+          <header class="adoption-v10-card-head">
+            <div><h3>通報後得知處遇結果</h3><p>啟用前（問卷）的人數占比</p></div>
+            <button type="button" class="adoption-v10-info" data-adoption-info="result">指標定義</button>
+          </header>
+          <div class="adoption-v10-list" id="adoptionResultList"></div>
+          <p class="adoption-v10-note">平台啟用後：個案結案當日由系統通知通報者，並發送滿意度問卷。</p>
+        </article>
+        <article class="adoption-v10-card">
+          <header class="adoption-v10-card-head">
+            <div><h3>轉介滿意度</h3><p>滿分 5 分</p></div>
+            <button type="button" class="adoption-v10-info" data-adoption-info="satisfaction">指標定義</button>
+          </header>
+          <div class="adoption-v10-pair" id="adoptionSatisfaction"></div>
+        </article>
+      </div>
+    </div>
+
+    <div class="adoption-v10-tooltip" id="adoptionTooltip" role="tooltip" hidden></div>
+  </section>
+
   <!-- 9 -->
   <section class="page" id="command">
     <div class="command-view-tabs" id="commandViewTabs" role="tablist" aria-label="指揮儀表板檢視">
@@ -13771,6 +13925,22 @@
     </div>
   </section>
 </div>
+
+<!-- v10：平台導入成效分析的指標定義（放在 .dashboard 外，避開 v84 在頁面內清掉 *-shell 的 max-height） -->
+<dialog class="v5-dialog adoption-v10-dialog" id="adoptionInfoDialog" aria-labelledby="adoptionInfoTitle">
+  <div class="v5-dialog-shell">
+    <header class="v5-dialog-head">
+      <div>
+        <span class="v5-dialog-eyebrow">指標定義</span>
+        <h3 id="adoptionInfoTitle">指標名稱</h3>
+      </div>
+      <button type="button" class="v5-dialog-close" data-close-dialog aria-label="關閉">×</button>
+    </header>
+    <div class="v5-dialog-body">
+      <dl class="adoption-v10-defs" id="adoptionInfoBody"></dl>
+    </div>
+  </div>
+</dialog>
 
 
 
@@ -22783,6 +22953,583 @@ html body .dashboard #hospital.page .v9-scope-card .hospital-his-info-btn:hover{
 
 <!-- qa：原 <script id="v9-hospital-indicators-behavior">（模擬資料）已移除，改由檔尾 qa-data 模組依資料繪製 -->
 
+<style id="v10-adoption-filters">
+/* v10：新頁的子頁籤、日期篩選、單位按鈕與頁面骨架照 #outcome 的最終樣式移植（舊層以 :is(#basic,…,#command) 指定頁面，新頁吃不到）。
+   由原規則換成 #adoption 的對應元素產生，權重、media 條件、!important 與原規則相同；只留下實際影響畫面的規則。qa：與原型 v10 相同 */
+#adoption .outcome-v62-toolbar { justify-content: flex-start !important; align-items: flex-end !important; gap: 0px !important; }
+@media (min-width: 1200px) {
+  #adoption .page-time-filter { min-height: 54px !important; padding: 5px 10px !important; align-items: center !important; gap: 12px !important; flex: 0 0 54px !important; }
+}
+@media (min-width: 1200px) {
+  #adoption .page-time-filter .command-date-filter { min-height: 0px !important; }
+}
+@media (min-width: 1200px) {
+  #adoption .page-time-filter .command-date-arrow { min-height: 32px !important; }
+}
+@media (max-width: 1199px) {
+  #adoption .page-time-filter .command-quick-filter { width: 100% !important; }
+}
+#adoption.page.active { display: grid !important; grid-template-rows: auto minmax(0px, 1fr) !important; gap: 12px !important; overflow: hidden !important; }
+#adoption .outcome-v62-toolbar { display: flex; }
+#adoption .outcome-v62-tabs { min-width: 0px; display: flex; align-items: flex-end; }
+#adoption .outcome-v62-tab:hover { color: rgb(33, 143, 238); background: rgb(247, 251, 255); }
+@media (max-width: 1100px) {
+  #adoption .outcome-v62-toolbar { flex-direction: column; }
+}
+#adoption .adoption-filter-row { gap: 10px !important; margin: 0px !important; padding: 0px !important; min-width: 0px !important; }
+#adoption #adoptionUnitFilter { flex: 0 0 auto !important; min-width: 0px !important; align-items: center !important; justify-content: flex-start !important; gap: 6px !important; }
+#adoption #adoptionUnitFilter .risk-filter-btn { flex: 0 0 auto !important; min-width: 88px !important; padding: 0px 13px !important; }
+@media (min-width: 1200px) {
+  #adoption #adoptionUnitFilter { min-height: 32px !important; }
+}
+@media (max-width: 1199px) {
+  #adoption .adoption-filter-row { flex-wrap: wrap !important; }
+}
+@media (max-width: 680px) {
+  #adoption .adoption-filter-row { flex-direction: column !important; }
+}
+@media (max-width: 680px) {
+  #adoption #adoptionUnitFilter { width: 100% !important; display: grid !important; }
+}
+@media (max-width: 680px) {
+  #adoption #adoptionUnitFilter .risk-filter-btn { min-width: 0px !important; }
+}
+@media (min-width: 1200px) {
+  #adoption.page.active { grid-template-rows: 42px 54px 34px minmax(0px, 1fr) !important; grid-auto-rows: 0px !important; align-content: stretch !important; gap: 7px !important; height: calc(-124px + 100vh) !important; padding-top: 7px !important; }
+}
+@media (min-width: 1200px) {
+  #adoption > .outcome-v62-toolbar { grid-row: 1 !important; }
+}
+@media (min-width: 1200px) {
+  #adoption > .adoption-time-filter { grid-row: 2 !important; margin: 0px !important; }
+}
+@media (min-width: 1200px) {
+  #adoption > .adoption-filter-row { grid-row: 3 !important; align-self: start !important; }
+}
+#adoption .outcome-v62-tab:hover { color: var(--ui-primary) !important; background: rgb(247, 251, 255) !important; }
+#adoption .outcome-v62-tab.active { color: var(--ui-primary) !important; background: rgb(255, 255, 255) !important; border-color: rgb(223, 229, 236) !important; box-shadow: inset 0 3px 0 var(--ui-primary) !important; }
+#adoption > .page-time-filter .command-date-filter { min-width: 0px !important; gap: 7px !important; }
+#adoption > .page-time-filter .command-date-filter label { min-height: 0px !important; display: grid !important; gap: 2px !important; align-content: end !important; font-size: 9px !important; }
+#adoption > .page-time-filter .command-date-filter label > span { line-height: 10px !important; white-space: nowrap !important; }
+#adoption > .page-time-filter .command-date-filter input { width: 145px !important; min-width: 145px !important; height: var(--ui-control-h) !important; }
+#adoption > .page-time-filter .command-date-filter input:focus { border-color: var(--ui-primary) !important; box-shadow: rgba(33, 143, 238, 0.09) 0px 0px 0px 2px !important; }
+#adoption > .page-time-filter .command-date-arrow { height: var(--ui-control-h) !important; display: flex !important; align-items: center !important; justify-content: center !important; align-self: flex-end !important; padding: 0px 1px !important; }
+#adoption > .page-time-filter .command-apply-btn { height: var(--ui-control-h) !important; min-height: var(--ui-control-h) !important; align-self: flex-end !important; padding: 0px 14px !important; }
+#adoption > .page-time-filter .command-quick-filter { margin-left: auto !important; align-self: center !important; align-items: center !important; flex: 0 0 auto !important; }
+#adoption > .page-time-filter .command-quick-filter button { height: var(--ui-control-h) !important; min-height: var(--ui-control-h) !important; min-width: 78px !important; padding: 0px 12px !important; font-weight: 500 !important; }
+#adoption > .page-time-filter .command-quick-filter button.active { border-color: var(--ui-primary) !important; background: var(--ui-primary-soft) !important; color: var(--ui-primary) !important; font-weight: 700 !important; }
+#adoption > .page-time-filter .command-quick-filter button:hover { border-color: var(--ui-primary) !important; background: var(--ui-primary-soft) !important; color: var(--ui-primary) !important; font-weight: 700 !important; }
+#adoption > .analysis-filter-row { min-height: 34px !important; }
+#adoption > .analysis-filter-row .analysis-filter-label { line-height: 1 !important; white-space: nowrap !important; }
+#adoption > .analysis-filter-row .risk-filter-btn { height: var(--ui-control-h) !important; min-height: var(--ui-control-h) !important; line-height: 30px !important; font-weight: 500 !important; }
+#adoption > .analysis-filter-row .risk-filter-btn:hover { border-color: var(--ui-primary) !important; color: var(--ui-primary) !important; background: rgb(247, 251, 255) !important; }
+#adoption > .analysis-filter-row .risk-filter-btn.active { border-color: var(--ui-primary) !important; background: var(--ui-primary) !important; color: rgb(255, 255, 255) !important; font-weight: 700 !important; }
+@media (max-width: 1199px) {
+  #adoption > .page-time-filter { min-height: 0px !important; gap: 8px !important; padding: 9px 10px !important; }
+}
+@media (max-width: 1199px) {
+  #adoption > .page-time-filter .command-date-filter { height: auto !important; flex-wrap: wrap !important; }
+}
+@media (max-width: 1199px) {
+  #adoption > .page-time-filter .command-quick-filter button { flex: 1 1 0px !important; min-width: 70px !important; }
+}
+@media (max-width: 680px) {
+  #adoption > .page-time-filter .command-date-filter label { flex: 1 1 130px !important; }
+}
+#adoption > .outcome-v62-toolbar { height: var(--ui-subtab-h) !important; min-height: var(--ui-subtab-h) !important; margin: 0px 0px 8px !important; border-bottom: 1px solid rgb(223, 229, 236) !important; }
+#adoption > .outcome-v62-toolbar > .outcome-v62-tabs { width: 100% !important; min-height: var(--ui-subtab-h) !important; justify-content: flex-start !important; gap: var(--ui-subtab-gap) !important; }
+#adoption .outcome-v62-tab { flex: 0 0 auto !important; min-width: var(--ui-subtab-min-w) !important; min-height: var(--ui-subtab-h) !important; padding: 0px 18px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-width: 1px 1px 0px !important; border-style: solid solid none !important; border-color: transparent transparent currentcolor !important; border-radius: 7px 7px 0px 0px !important; background: transparent !important; color: rgb(102, 112, 133) !important; font-family: inherit !important; font-size: 12.5px !important; line-height: 1 !important; font-weight: 700 !important; white-space: nowrap !important; cursor: pointer !important; }
+#adoption .outcome-v62-tab:hover { color: var(--ui-primary) !important; background: rgb(247, 251, 255) !important; }
+@media (max-width: 1199px) {
+  #adoption > .outcome-v62-toolbar { scrollbar-width: thin; overflow: auto hidden !important; }
+}
+@media (max-width: 1199px) {
+  #adoption > .outcome-v62-toolbar > .outcome-v62-tabs { min-width: 100% !important; }
+}
+@media (max-width: 680px) {
+  #adoption .outcome-v62-tab { min-width: 104px !important; }
+}
+@media (max-width: 1199px) {
+  .dashboard .page.active#adoption { display: flex !important; flex-direction: column !important; overflow: visible !important; padding-top: 14px !important; }
+}
+@media (max-width: 1199px) {
+  .dashboard .page.active#adoption > :not(dialog) { flex: 0 0 auto !important; max-width: 100% !important; min-width: 0px !important; margin-bottom: 0px !important; overflow-y: visible !important; }
+}
+@media (max-width: 899px) {
+  .dashboard .page#adoption :is(.eff-v79-tabs, .outcome-v62-tabs, .command-view-tabs) { scrollbar-width: none; width: 100% !important; gap: 6px !important; }
+}
+@media (max-width: 899px) {
+  .dashboard .page#adoption :is(.eff-v79-tabs, .outcome-v62-tabs, .command-view-tabs)::-webkit-scrollbar { display: none; }
+}
+@media (max-width: 899px) {
+  .dashboard .page#adoption :is(.risk-filter-btn, .outcome-status-btn, .outcome-sort-btn) { white-space: nowrap !important; min-height: var(--v84-tap) !important; }
+}
+@media (max-width: 899px) {
+  .dashboard .page#adoption :is(.command-filter-card, .page-time-filter, .adoption-time-filter, .flow-filter) { align-items: stretch !important; justify-content: flex-start !important; gap: 10px !important; padding: 12px !important; }
+}
+@media (max-width: 899px) {
+  .dashboard .page#adoption :is(.command-filter-card, .page-time-filter, .flow-filter) .command-date-filter { display: grid !important; grid-template-columns: minmax(0px, 1fr) auto minmax(0px, 1fr) !important; align-items: end !important; gap: 8px !important; }
+}
+@media (max-width: 899px) {
+  .dashboard .page#adoption :is(.command-filter-card, .page-time-filter, .flow-filter) .command-date-filter label { grid-template-rows: auto auto !important; min-width: 0px !important; height: auto !important; gap: 4px !important; }
+}
+@media (max-width: 899px) {
+  .dashboard .page#adoption :is(.command-filter-card, .page-time-filter, .flow-filter) .command-date-filter label > span { height: auto !important; line-height: 1.3 !important; }
+}
+@media (max-width: 899px) {
+  .dashboard .page#adoption :is(.command-filter-card, .page-time-filter, .flow-filter) .command-date-filter input { width: 100% !important; min-width: 0px !important; height: var(--v84-tap) !important; }
+}
+@media (max-width: 899px) {
+  .dashboard .page#adoption :is(.command-filter-card, .page-time-filter, .flow-filter) .command-date-arrow { align-self: center !important; padding: 0px !important; }
+}
+@media (max-width: 899px) {
+  .dashboard .page#adoption :is(.command-filter-card, .page-time-filter, .flow-filter) .command-apply-btn { grid-column: 1 / -1 !important; height: var(--v84-tap) !important; }
+}
+@media (max-width: 899px) {
+  .dashboard .page#adoption :is(.command-filter-card, .page-time-filter, .flow-filter) .command-quick-filter { height: auto !important; }
+}
+@media (max-width: 899px) {
+  .dashboard .page#adoption :is(.command-filter-card, .page-time-filter, .flow-filter) .command-quick-filter button { min-width: 0px !important; height: var(--v84-tap) !important; padding: 0px 8px !important; }
+}
+@media (max-width: 899px) {
+  .dashboard .page#adoption :is(.adoption-filter-row, .analysis-filter-row, .reporter-page-head, .eff-v81-tabs-row, .outcome-v62-toolbar) { flex-wrap: wrap !important; align-items: center !important; gap: 8px !important; height: auto !important; min-height: 0px !important; }
+}
+@media (max-width: 599px) {
+  .dashboard .page#adoption :is(.command-filter-card, .page-time-filter, .flow-filter) .command-date-filter { grid-template-columns: minmax(0px, 1fr) !important; }
+}
+@media (max-width: 599px) {
+  .dashboard .page#adoption :is(.command-filter-card, .page-time-filter, .flow-filter) .command-date-arrow { display: none !important; }
+}
+@media (max-width: 599px) {
+  .dashboard .page#adoption :is(.command-filter-card, .page-time-filter, .flow-filter) .command-quick-filter { flex-wrap: wrap !important; }
+}
+@media (max-width: 599px) {
+  .dashboard .page#adoption :is(.command-filter-card, .page-time-filter, .flow-filter) .command-quick-filter button { flex: 1 1 calc(50% - 3px) !important; }
+}
+@media (min-width: 1200px) {
+  .dashboard .page.active#adoption :is(.eff-v79-tabs .eff-v79-tab, .outcome-v62-tabs .outcome-v62-tab, .command-view-tabs .command-view-tab) { font-size: clamp(12px, 0.76vw, 14.5px) !important; }
+}
+@media (max-width: 899px) {
+  html body .dashboard .page#adoption :is(.eff-v79-tabs, .outcome-v62-tabs, .command-view-tabs) { flex-wrap: wrap !important; overflow: visible !important; height: auto !important; min-height: 0px !important; padding: 2px 0px 4px !important; }
+}
+@media (max-width: 899px) {
+  html body .dashboard .page#adoption :is(.eff-v79-tab, .outcome-v62-tab, .command-view-tab) { flex: 0 1 auto !important; height: auto !important; min-height: 36px !important; padding: 7px 14px !important; border: 1px solid rgb(220, 229, 239) !important; border-radius: 999px !important; background: rgb(255, 255, 255) !important; color: rgb(89, 101, 121) !important; box-shadow: none !important; font-size: 13px !important; line-height: 1.3 !important; white-space: normal !important; }
+}
+@media (max-width: 899px) {
+  html body .dashboard .page#adoption :is(.eff-v79-tab, .outcome-v62-tab, .command-view-tab).active { background: rgb(33, 143, 238) !important; border-color: rgb(33, 143, 238) !important; color: rgb(255, 255, 255) !important; }
+}
+html body .dashboard .page.active#adoption #adoptionTimeFilter :is(.command-apply-btn, .command-quick-filter button) { font-size: var(--v7-filter-btn) !important; }
+html body .dashboard .page.active#adoption #adoptionTimeFilter .command-date-filter input { font-size: var(--v7-filter-input) !important; }
+html body .dashboard .page.active#adoption #adoptionTimeFilter .command-date-filter label > span { font-size: var(--v7-filter-cap) !important; }
+@media (min-width: 900px) and (max-width: 1199px) {
+  html body .dashboard .page.active#adoption #adoptionTimeFilter .command-date-filter label { height: auto !important; grid-template-rows: auto var(--ui-control-h) !important; }
+}
+@media (min-width: 900px) and (max-width: 1199px) {
+  html body .dashboard .page.active#adoption #adoptionTimeFilter .command-date-filter label > span { height: auto !important; line-height: 1.3 !important; }
+}
+html body .dashboard .page.active#adoption #adoptionUnitFilter .risk-filter-btn { font-size: var(--v7-filter-btn) !important; }
+html body .dashboard .page.active#adoption .analysis-filter-row .analysis-filter-label { font-size: var(--v7-filter-label) !important; }
+</style>
+
+<style id="v10-adoption">
+/* =========================================================================
+   v10：平台導入成效分析（#adoption）＋主選單第 10 顆
+   qa：整段從原型 v10 複製，只拿掉主選單欄數（qa 隱藏 AI、SNQ，欄數在 <style id="qa-data"> 設定）
+   ・舊層的共用規則多半以 :is(#basic,…,#command) 指定頁面，新頁不在清單內；
+     這裡照 #outcome（同樣是「子頁籤＋日期＋類別」的頁）各尺寸的最終樣式補上，選擇器以 html body .dashboard #adoption 起頭壓過舊層。
+   ・圖表配色（ordinal、發散）都跑過 dataviz 驗證；色塊內文字依 APCA 選白或深色。
+   ========================================================================= */
+:root{
+  --v10-ink:#27364a;
+  --v10-ink-2:#566171;
+  --v10-muted:#8a95a5;
+  --v10-line:#e5e9ef;
+  --v10-grid:#e8edf2;
+  --v10-bar:#218fee;
+  --v10-track:#e6f1fd;
+  --v10-up:#1f7a4d;
+  --v10-down:#b42318;
+}
+
+/* ---------- 主選單：qa 的欄數在 <style id="qa-data"> 設定（原型這裡是 ≥1200px 10 欄） ---------- */
+
+/* ---------- 頁面骨架 ---------- */
+html body .dashboard #adoption.page .adoption-v10-panel{ display:none; min-width:0; min-height:0; }
+html body .dashboard #adoption.page .adoption-v10-panel.active{ display:grid; grid-template-rows:auto minmax(0,1fr); gap:10px; }
+html body .dashboard #adoption.page .adoption-v10-panel[hidden]{ display:none !important; }
+html body .dashboard #adoption.page .adoption-v10-panel:not([data-adoption-panel="training"]).active{ grid-template-rows:minmax(0,1fr); }
+
+/* 單位按鈕有 5 顆：≤1199px 舊層把類別按鈕排成 3 欄格線會折成兩列，改 5 欄一列 */
+@media (max-width:1199px){
+  html body .dashboard #adoption.page #adoptionUnitFilter{ grid-template-columns:repeat(5,minmax(0,1fr)) !important; }
+}
+html body .dashboard #adoption .adoption-v10-scope{
+  margin:0 0 0 auto;
+  color:var(--v10-muted);
+  font-size:12.5px;
+  line-height:1.35;
+  text-align:right;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  min-width:0;
+}
+
+/* KPI 數值卡 */
+html body .dashboard #adoption .adoption-v10-kpis{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+}
+html body .dashboard #adoption .adoption-v10-kpi{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:2px;
+  min-width:0;
+  padding:10px 16px;
+  border:1px solid var(--v10-line);
+  border-radius:10px;
+  background:#fff;
+  box-shadow:0 1px 4px rgba(24,39,75,.04);
+}
+html body .dashboard #adoption .adoption-v10-kpi span{ color:var(--v10-ink-2); font-size:13.5px; font-weight:700; }
+html body .dashboard #adoption .adoption-v10-kpi strong{ color:var(--v10-ink); font-size:26px; font-weight:800; line-height:1.15; }
+html body .dashboard #adoption .adoption-v10-kpi small{ color:var(--v10-muted); font-size:12px; line-height:1.3; }
+
+/* 左一大卡、右兩小卡 */
+html body .dashboard #adoption .adoption-v10-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.38fr) minmax(0,1fr);
+  grid-template-rows:minmax(0,1fr) minmax(0,1fr);
+  gap:10px;
+  min-height:0;
+}
+html body .dashboard #adoption .adoption-v10-main{ grid-row:1 / span 2; }
+
+html body .dashboard #adoption .adoption-v10-card{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  min-width:0;
+  min-height:0;
+  padding:12px 16px 12px;
+  border:1px solid var(--v10-line);
+  border-radius:10px;
+  background:#fff;
+  box-shadow:0 1px 4px rgba(24,39,75,.04);
+  overflow:hidden;
+}
+html body .dashboard #adoption .adoption-v10-card-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  flex:0 0 auto;
+}
+html body .dashboard #adoption .adoption-v10-card-head h3{ margin:0; color:var(--v10-ink); font-size:16px; font-weight:800; line-height:1.3; }
+html body .dashboard #adoption .adoption-v10-card-head p{ margin:3px 0 0; color:var(--v10-muted); font-size:12.5px; line-height:1.35; }
+html body .dashboard #adoption .adoption-v10-info{
+  flex:0 0 auto;
+  height:24px;
+  padding:0 9px;
+  border:1px solid #d6e0ea;
+  border-radius:6px;
+  background:#fff;
+  color:#6c798b;
+  font:inherit;
+  font-size:12px;
+  font-weight:800;
+  line-height:22px;
+  white-space:nowrap;
+  cursor:pointer;
+}
+html body .dashboard #adoption .adoption-v10-info:hover{ background:#f3f6f9; color:var(--v10-ink); }
+html body .dashboard #adoption .adoption-v10-info:focus-visible,
+html body .dashboard #adoption [tabindex="0"]:focus-visible{ outline:2px solid var(--v10-bar); outline-offset:2px; }
+
+/* ---------- 長條清單（meter：對滿分；rank：依最大值） ---------- */
+html body .dashboard #adoption .adoption-v10-list{
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+  gap:4px;
+  min-height:0;
+  flex:1 1 auto;
+}
+html body .dashboard #adoption .adoption-v10-scroll{ overflow-y:auto; padding-right:4px; }
+html body .dashboard #adoption .adoption-v10-row{
+  display:grid;
+  grid-template-columns:minmax(96px,42%) minmax(48px,1fr) 4.6em;
+  align-items:center;
+  gap:10px;
+  min-height:26px;
+  padding:2px 4px;
+  border-radius:6px;
+  cursor:default;
+}
+html body .dashboard #adoption .adoption-v10-row:hover{ background:#f5f8fb; }
+html body .dashboard #adoption .adoption-v10-row-name{
+  display:flex;
+  align-items:baseline;
+  flex-wrap:wrap;
+  column-gap:6px;
+  min-width:0;
+  color:var(--v10-ink);
+  font-size:13.5px;
+  font-weight:700;
+  line-height:1.3;
+}
+html body .dashboard #adoption .adoption-v10-row-name small{ color:var(--v10-muted); font-size:12px; font-weight:400; }
+html body .dashboard #adoption .adoption-v10-track{
+  position:relative;
+  display:block;
+  height:12px;
+  border-radius:4px;
+  overflow:hidden;
+}
+html body .dashboard #adoption .adoption-v10-row.is-meter .adoption-v10-track{ background:var(--v10-track); }
+html body .dashboard #adoption .adoption-v10-track > i{
+  position:absolute;
+  inset:0 auto 0 0;
+  display:block;
+  background:var(--v10-bar);
+  border-radius:0 4px 4px 0;
+}
+html body .dashboard #adoption .adoption-v10-row-value{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  color:var(--v10-ink);
+  font-size:14px;
+  font-weight:800;
+  line-height:1.15;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+html body .dashboard #adoption .adoption-v10-row-value small{ color:var(--v10-muted); font-size:11.5px; font-weight:400; }
+html body .dashboard #adoption .adoption-v10-empty{ margin:auto 0; padding:18px 8px; color:#98a2b3; font-size:13px; text-align:center; }
+html body .dashboard #adoption .adoption-v10-empty.inline{ margin:0; padding:0 0 0 4px; text-align:left; }
+html body .dashboard #adoption .adoption-v10-note{ margin:0; flex:0 0 auto; color:var(--v10-ink-2); font-size:12.5px; line-height:1.45; }
+
+/* ---------- 圖例 ---------- */
+html body .dashboard #adoption .adoption-v10-legend{ display:flex; flex-wrap:wrap; gap:4px 14px; flex:0 0 auto; color:var(--v10-ink-2); font-size:12.5px; }
+html body .dashboard #adoption .adoption-v10-legend-item{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+html body .dashboard #adoption .adoption-v10-legend-item i{ width:12px; height:12px; border-radius:3px; flex:0 0 auto; }
+
+/* ---------- 100% 堆疊橫條（色塊之間 2px 白色間隔；同意程度與處理時效共用，各列等長） ---------- */
+html body .dashboard #adoption .adoption-v10-stack{
+  position:relative;
+  display:flex;
+  align-items:stretch;
+  height:22px;
+  min-width:0;
+  border-radius:4px;
+  overflow:hidden;
+}
+html body .dashboard #adoption .adoption-v10-seg{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  /* 只有 1 人的色塊扣掉 2px 間隔會看不見：至少 4px，多出來的由其他色塊依比例縮回，總長不變 */
+  flex:0 1 auto;
+  min-width:4px;
+  box-shadow:inset -2px 0 0 #fff;
+  cursor:default;
+}
+html body .dashboard #adoption .adoption-v10-seg:last-child{ box-shadow:none; }
+html body .dashboard #adoption .adoption-v10-seg:hover{ filter:brightness(1.06); }
+html body .dashboard #adoption .adoption-v10-seg em{ font-style:normal; font-size:12px; font-weight:800; line-height:1; white-space:nowrap; padding-right:2px; }
+html body .dashboard #adoption .adoption-v10-seg em[hidden]{ display:none; }
+
+/* 同意程度 */
+html body .dashboard #adoption .adoption-v10-likert{ display:flex; flex-direction:column; justify-content:space-evenly; gap:10px; flex:1 1 auto; min-height:0; }
+html body .dashboard #adoption .adoption-v10-likert-row{
+  display:grid;
+  grid-template-columns:minmax(120px,34%) minmax(0,1fr) 5.4em;
+  align-items:center;
+  gap:12px;
+}
+html body .dashboard #adoption .adoption-v10-likert-row .adoption-v10-row-name{ font-size:14px; }
+
+/* 處理時效 */
+html body .dashboard #adoption .adoption-v10-timing{ display:flex; flex-direction:column; justify-content:space-evenly; gap:10px; flex:1 1 auto; min-height:0; }
+html body .dashboard #adoption .adoption-v10-timing-group{ display:flex; flex-direction:column; gap:5px; }
+html body .dashboard #adoption .adoption-v10-timing-group > header{ display:flex; align-items:baseline; flex-wrap:wrap; gap:2px 10px; }
+html body .dashboard #adoption .adoption-v10-timing-group > header b{ color:var(--v10-ink); font-size:14.5px; font-weight:800; }
+html body .dashboard #adoption .adoption-v10-timing-group > header span{ color:var(--v10-muted); font-size:12px; }
+html body .dashboard #adoption .adoption-v10-timing-group > header em{ margin-left:auto; color:var(--v10-ink-2); font-size:12.5px; font-style:normal; white-space:nowrap; }
+html body .dashboard #adoption .adoption-v10-timing-group > header em strong{ color:var(--v10-ink); font-size:14px; font-weight:800; }
+html body .dashboard #adoption .adoption-v10-stack-row{
+  display:grid;
+  grid-template-columns:minmax(118px,24%) minmax(0,1fr);
+  align-items:center;
+  gap:10px;
+}
+
+/* 轉介滿意度：啟用前 → 平台 */
+html body .dashboard #adoption .adoption-v10-pair{ display:flex; flex-direction:column; justify-content:center; gap:8px; flex:1 1 auto; min-height:0; }
+html body .dashboard #adoption .adoption-v10-pair-row{ display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:12px; }
+html body .dashboard #adoption .adoption-v10-pair-item{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  min-width:0;
+  padding:10px 14px;
+  border-radius:8px;
+  background:#f6f8fb;
+}
+html body .dashboard #adoption .adoption-v10-pair-item span{ color:var(--v10-ink-2); font-size:13px; font-weight:700; }
+html body .dashboard #adoption .adoption-v10-pair-item strong{ color:var(--v10-ink); font-size:28px; font-weight:800; line-height:1.15; }
+html body .dashboard #adoption .adoption-v10-pair-item small{ color:var(--v10-muted); font-size:12px; }
+html body .dashboard #adoption .adoption-v10-pair-arrow{ color:var(--v10-muted); font-size:20px; font-weight:700; }
+html body .dashboard #adoption .adoption-v10-delta{ margin:0; display:flex; align-items:center; gap:6px; font-size:13.5px; font-weight:800; }
+html body .dashboard #adoption .adoption-v10-delta.up{ color:var(--v10-up); }
+html body .dashboard #adoption .adoption-v10-delta.down{ color:var(--v10-down); }
+html body .dashboard #adoption .adoption-v10-delta-icon{ font-size:11px; }
+
+/* ---------- 提示框 ---------- */
+.adoption-v10-tooltip{
+  position:fixed;
+  z-index:1200;
+  max-width:300px;
+  padding:9px 11px;
+  border:1px solid #dfe5ec;
+  border-radius:8px;
+  background:#fff;
+  box-shadow:0 10px 28px rgba(15,32,56,.18);
+  color:var(--v10-ink);
+  font-size:12.5px;
+  line-height:1.4;
+  pointer-events:none;
+}
+.adoption-v10-tooltip[hidden]{ display:none; }
+.adoption-v10-tip-title{ margin-bottom:4px; color:var(--v10-muted); font-size:12px; }
+.adoption-v10-tip-row{ display:flex; align-items:baseline; gap:8px; }
+.adoption-v10-tip-row strong{ font-size:14px; font-weight:800; font-variant-numeric:tabular-nums; }
+.adoption-v10-tip-row span{ color:var(--v10-ink-2); }
+
+/* ---------- 指標定義 dialog ---------- */
+dialog.adoption-v10-dialog{ width:min(720px,calc(100vw - 32px)); }
+.adoption-v10-defs{ margin:0; display:grid; grid-template-columns:max-content minmax(0,1fr); gap:10px 18px; }
+.adoption-v10-defs dt{ color:var(--v10-ink); font-size:14px; font-weight:800; line-height:1.55; }
+.adoption-v10-defs dd{ margin:0; color:#344054; font-size:14px; line-height:1.55; }
+@media (max-width:599px){
+  .adoption-v10-defs{ grid-template-columns:1fr; gap:4px; }
+  .adoption-v10-defs dd{ margin-bottom:8px; }
+}
+
+/* ---------- 桌機（≥1200px，頁面鎖在視窗高度內） ---------- */
+@media (min-width:1200px){
+  /* 數值卡：大字在左、名稱與說明在右，省下一列高度 */
+  html body .dashboard #adoption .adoption-v10-kpi{
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr);
+    grid-template-areas:"value label" "value note";
+    align-items:center;
+    column-gap:14px;
+    row-gap:1px;
+    padding:8px 16px;
+  }
+  html body .dashboard #adoption .adoption-v10-kpi strong{ grid-area:value; font-size:28px; }
+  html body .dashboard #adoption .adoption-v10-kpi span{ grid-area:label; align-self:end; }
+  html body .dashboard #adoption .adoption-v10-kpi small{ grid-area:note; align-self:start; }
+  /* 預期效益：三張卡並排（挑戰、建議各有 6 列，疊成兩張會放不下） */
+  html body .dashboard #adoption .adoption-v10-grid.is-three{
+    grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);
+    grid-template-rows:minmax(0,1fr);
+  }
+  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-main{ grid-row:auto; }
+  /* 清單放不下時在卡片內捲動，不會壓到下方說明 */
+  html body .dashboard #adoption .adoption-v10-list{ overflow-y:auto; }
+  /* 高的視窗（1920×1080 等）卡片下方有空：每列往下撐，最多 2.5em（比照 v9 醫療機構端的清單） */
+  html body .dashboard #adoption .adoption-v10-list > .adoption-v10-row{ flex:1 1 auto; max-height:2.5em; }
+  /* 三欄的卡片較窄：名稱在上、長條與數值在下，長名稱不會擠成三行 */
+  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-row{
+    grid-template-columns:minmax(0,1fr) 4.4em;
+    grid-template-areas:"name name" "bar value";
+    row-gap:3px;
+    max-height:none;
+    flex:0 0 auto;
+    padding:3px 4px;
+  }
+  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-row .adoption-v10-row-name{ grid-area:name; }
+  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-row .adoption-v10-track{ grid-area:bar; }
+  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-row .adoption-v10-row-value{ grid-area:value; }
+  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-list{ justify-content:space-evenly; }
+  /* 處理時效三組：由上往下排，組距隨視窗高度放大但有上限（space-evenly 在 1080 高會拉得太開） */
+  html body .dashboard #adoption .adoption-v10-timing{ justify-content:flex-start; gap:clamp(10px,2.6vh,26px); padding-top:4px; }
+  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-likert-row{
+    grid-template-columns:minmax(0,1fr) 5.4em;
+    grid-template-areas:"name name" "bar value";
+    row-gap:6px;
+  }
+  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-likert-row .adoption-v10-row-name{ grid-area:name; }
+  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-likert-row .adoption-v10-stack{ grid-area:bar; }
+  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-likert-row .adoption-v10-row-value{ grid-area:value; }
+}
+/* 矮視窗（1536×730、1366×657、1280×720 這類）：卡片標題與說明同一行、列距縮小 */
+@media (min-width:1200px) and (max-height:820px){
+  html body .dashboard #adoption.page .adoption-v10-panel.active{ gap:8px; }
+  html body .dashboard #adoption .adoption-v10-kpis,
+  html body .dashboard #adoption .adoption-v10-grid{ gap:8px; }
+  html body .dashboard #adoption .adoption-v10-kpi{ padding:6px 14px; }
+  html body .dashboard #adoption .adoption-v10-kpi strong{ font-size:24px; }
+  html body .dashboard #adoption .adoption-v10-card{ gap:6px; padding:9px 14px; }
+  html body .dashboard #adoption .adoption-v10-card-head > div{ display:flex; align-items:baseline; flex-wrap:wrap; column-gap:10px; }
+  html body .dashboard #adoption .adoption-v10-card-head h3{ font-size:15px; }
+  html body .dashboard #adoption .adoption-v10-card-head p{ margin:0; font-size:12px; }
+  html body .dashboard #adoption .adoption-v10-list{ gap:2px; }
+  html body .dashboard #adoption .adoption-v10-row{ min-height:22px; padding:1px 4px; }
+  html body .dashboard #adoption .adoption-v10-likert{ gap:6px; }
+  html body .dashboard #adoption .adoption-v10-timing{ gap:8px; padding-top:0; }
+}
+
+/* ---------- 平板（900–1199px）：頁面依內容撐高 ---------- */
+@media (min-width:900px) and (max-width:1199px){
+  html body .dashboard #adoption .adoption-v10-grid{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-template-rows:auto auto; }
+  html body .dashboard #adoption .adoption-v10-main{ grid-row:auto; grid-column:1 / -1; }
+  html body .dashboard #adoption .adoption-v10-scroll{ overflow:visible; padding-right:0; }
+  html body .dashboard #adoption .adoption-v10-likert,
+  html body .dashboard #adoption .adoption-v10-timing{ gap:14px; }
+  /* 挑戰、建議兩張卡並排時較窄：名稱在上、長條與數值在下 */
+  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-row{
+    grid-template-columns:minmax(0,1fr) 4.4em;
+    grid-template-areas:"name name" "bar value";
+    row-gap:3px;
+    padding:3px 4px;
+  }
+  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-row .adoption-v10-row-name{ grid-area:name; }
+  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-row .adoption-v10-track{ grid-area:bar; }
+  html body .dashboard #adoption .adoption-v10-grid.is-three .adoption-v10-row .adoption-v10-row-value{ grid-area:value; }
+}
+
+/* ---------- 手機（≤899px） ---------- */
+@media (max-width:899px){
+  html body .dashboard #adoption .adoption-v10-kpis{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  html body .dashboard #adoption .adoption-v10-kpi{ padding:9px 12px; }
+  html body .dashboard #adoption .adoption-v10-kpi strong{ font-size:22px; }
+  html body .dashboard #adoption .adoption-v10-grid{ grid-template-columns:minmax(0,1fr); grid-template-rows:auto; }
+  html body .dashboard #adoption .adoption-v10-main{ grid-row:auto; }
+  html body .dashboard #adoption .adoption-v10-card{ padding:12px; }
+  html body .dashboard #adoption .adoption-v10-card-head h3{ font-size:15px; }
+  html body .dashboard #adoption .adoption-v10-scroll{ overflow:visible; padding-right:0; }
+  html body .dashboard #adoption .adoption-v10-row{ grid-template-columns:minmax(0,1fr) 4.4em; grid-template-areas:"name value" "bar bar"; row-gap:4px; padding:4px 2px; }
+  html body .dashboard #adoption .adoption-v10-row .adoption-v10-row-name{ grid-area:name; }
+  html body .dashboard #adoption .adoption-v10-row .adoption-v10-track{ grid-area:bar; }
+  html body .dashboard #adoption .adoption-v10-row .adoption-v10-row-value{ grid-area:value; }
+  html body .dashboard #adoption .adoption-v10-likert-row{ grid-template-columns:minmax(0,1fr) 5em; grid-template-areas:"name value" "bar bar"; row-gap:6px; }
+  html body .dashboard #adoption .adoption-v10-likert-row .adoption-v10-row-name{ grid-area:name; }
+  html body .dashboard #adoption .adoption-v10-likert-row .adoption-v10-stack{ grid-area:bar; }
+  html body .dashboard #adoption .adoption-v10-likert-row .adoption-v10-row-value{ grid-area:value; }
+  html body .dashboard #adoption .adoption-v10-stack-row{ grid-template-columns:minmax(0,1fr); gap:4px; }
+  html body .dashboard #adoption .adoption-v10-timing-group > header em{ margin-left:0; }
+  html body .dashboard #adoption .adoption-v10-pair-item strong{ font-size:24px; }
+  html body .dashboard #adoption .adoption-v10-scope{ margin:0; width:100%; text-align:left; white-space:normal; }
+}
+</style>
+
 <style id="qa-data">
 /* =========================================================================
    qa-data：qa 版的資料層樣式（狀態列、載入前隱藏、尚無資料、沿用 prod 的版面修正）
@@ -22813,10 +23560,10 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
   }
 }
 
-/* AI模型預測準確率、醫院內控指標(SNQ) 先隱藏：主選單少兩顆，≥1200px 由 9 欄改 7 欄（900–1199px 原本就是 4 欄兩列，第二列剩 3 顆）。
-   恢復其中一頁時欄數加 1 */
+/* AI模型預測準確率、醫院內控指標(SNQ) 先隱藏，另加原型 v10 的「平台導入成效分析」：主選單 8 顆，≥1200px 8 欄
+   （900–1199px 原本就是 4 欄，剛好兩列）。恢復其中一頁時欄數加 1 */
 @media (min-width:1200px){
-  .tabs{ grid-template-columns:repeat(7,1fr) !important; }
+  .tabs{ grid-template-columns:repeat(8,1fr) !important; }
 }
 .dashboard #ai.page[hidden],
 .dashboard #snq.page[hidden]{ display:none !important; }
@@ -22941,6 +23688,9 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
      ★ 目前三處都隱藏：SNQ 與平台使用率 SHOW_PLATFORM=false（使用者 2026-11-11 指示）、AI 頁 SHOW_AI=false（2026-11-09）。
        兩個都是 false 就不讀這個檔，頁首也不顯示它的提示與範例標籤；renderSnq()／renderUsage()／renderAiScatter() 照常執行（畫成「尚無資料」）。
        恢復時把對應的改成 true，並還原主選單與子頁籤的按鈕。
+   ・data-que.json（schemaVersion 1）：教育訓練課後問卷，給原型 v10 新增的「平台導入成效分析」頁；由 .tool/que_to_json.py 從 Google 表單匯出檔轉出。
+     這裡只負責載入（RD.que、RD.queError），檢查、計算與繪製在下一段 <script id="qa-adoption">（RD.adoption）；
+     這個檔載入失敗只影響那一頁，頁首提示。
    ・normalizeCase() 把兩種通報轉成同一種案件物件，各頁 render*() 只讀案件物件。
      data.json 改欄位名或代碼時，只改 normalizeCase() 與下面的代碼表。
    ・日期篩選一律以通報時間（timePoint.reportedAt）的臺北日期為準，含頭尾；結案率不受日期篩選影響。
@@ -22954,6 +23704,7 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
 
   const DATA_FILE='data.json';
   const PLATFORM_FILE='data-platform.json';
+  const QUE_FILE='data-que.json';   /* 教育訓練課後問卷（平台導入成效分析），檢查與繪製在 qa-adoption */
   /* data-platform.json 的三個使用處目前都隱藏：醫院內控指標與平台使用率（2026-11-11）、AI模型預測準確率（2026-11-09）。
      兩個都是 false＝不讀 data-platform.json（檔案不存在也不會有 404 或頁首提示）；任一個 true 就讀 */
   const SHOW_PLATFORM=false;
@@ -23000,6 +23751,7 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
   const RD=window.RD={
     loaded:false, version:null, cases:[],
     platform:null, platformError:null, platformUpdated:null, platformHasTime:false,
+    que:null, queError:null,          /* data-que.json 的原始物件與載入錯誤；RD.adoption 由 qa-adoption 掛上 */
     updatedAt:null, updatedTime:null, updatedHasTime:false, asOf:null, dataStart:null, sample:false, stats:null,
     ranges:{}, types:{},
     basicCases(){ const r=RD.ranges.basic; return r ? casesIn(r.start,r.end) : []; },
@@ -23125,29 +23877,33 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
     return res.text();
   }
   async function loadFromServer(){
-    const [dataText,platform]=await Promise.all([
+    /* data-platform.json、data-que.json 讀不到或格式錯都不中斷，只記錯誤（頁首提示） */
+    const optional=file=>fetchText(file).then(t=>({ obj:parseJsonLoose(t,file) })).catch(err=>({ error:err.message || String(err) }));
+    const [dataText,platform,que]=await Promise.all([
       fetchText(DATA_FILE),
-      LOAD_PLATFORM
-        ? fetchText(PLATFORM_FILE).then(t=>({ obj:parseJsonLoose(t,PLATFORM_FILE) }),err=>({ error:err.message || String(err) }))
-        : {}
+      LOAD_PLATFORM ? optional(PLATFORM_FILE) : {},
+      optional(QUE_FILE)
     ]);
-    return { raw:parseJsonLoose(dataText,DATA_FILE), platform:platform.obj || null, platformError:platform.error || null };
+    return { raw:parseJsonLoose(dataText,DATA_FILE), platform:platform.obj || null, platformError:platform.error || null,
+      que:que.obj || null, queError:que.error || null };
   }
-  /* file:// 備援：手動選檔，可以一次選 data.json 與 data-platform.json（依內容判斷是哪一個，檔名不限） */
+  /* file:// 備援：手動選檔，可以一次選 data.json、data-que.json、data-platform.json（依內容判斷是哪一個，檔名不限） */
   async function loadFromPicker(fileList){
     const files=[...fileList];
     if(!files.length) throw new Error('沒有選取檔案');
-    let raw=null, platform=null;
+    let raw=null, platform=null, que=null;
     for(const f of files){
       const obj=parseJsonLoose(await f.text(),f.name);
       if(obj && (Array.isArray(obj.emg) || Array.isArray(obj.opt))) raw=obj;
+      else if(obj && Array.isArray(obj.responses)) que=obj;
       else if(obj && (obj.snq || obj.usage || obj.ai)) platform=obj;
-      else throw new Error(`看不出 ${f.name} 是 data.json 還是 data-platform.json`);
+      else throw new Error(`看不出 ${f.name} 是 data.json、data-que.json 還是 data-platform.json`);
     }
-    if(!raw) throw new Error(LOAD_PLATFORM ? '請選取 data.json（可以同時選 data-platform.json）' : '請選取 data.json');
+    if(!raw) throw new Error(`請選取 data.json（可以同時選 data-que.json${LOAD_PLATFORM ? '、data-platform.json' : ''}）`);
+    const queError=que ? null : `未選取 ${QUE_FILE}`;
     /* SHOW_PLATFORM、SHOW_AI 都是 false：選了 data-platform.json 也不用 */
-    if(!LOAD_PLATFORM) return { raw, platform:null, platformError:null };
-    return { raw, platform, platformError:platform ? null : `未選取 ${PLATFORM_FILE}` };
+    if(!LOAD_PLATFORM) return { raw, platform:null, platformError:null, que, queError };
+    return { raw, platform, platformError:platform ? null : `未選取 ${PLATFORM_FILE}`, que, queError };
   }
 
   function scoreSet(s){
@@ -24361,6 +25117,7 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
     const emgN=count(RD.cases,c=>c.kind==='emg'), optN=RD.cases.length-emgN;
     parts.push(`<span>總案件數 <b>${fmtInt(RD.cases.length)}</b> 件（緊急醫療 ${fmtInt(emgN)}／優化計畫 ${fmtInt(optN)}，${slashDate(RD.dataStart)} 起）</span>`);
     if(RD.platformError) parts.push(`<span class="rd-warn">平台資料（${PLATFORM_PAGES}）未載入：${esc(RD.platformError)}</span>`);
+    (RD.adoption ? RD.adoption.warnings() : []).forEach(w=>parts.push(`<span class="rd-warn">${esc(w)}</span>`));
     const s=RD.stats;
     if(s.badTime) parts.push(`<span class="rd-warn">已排除：通報時間無法解析 ${s.badTime} 件</span>`);
     if(s.beforeStart) parts.push(`<span class="rd-warn">已排除：通報日早於平台起始日 ${slashDate(PLATFORM_START)} 的 ${s.beforeStart} 件</span>`);
@@ -24384,15 +25141,17 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
     const why=err ? `資料載入失敗：${esc(err.message || err)}。` : '以 file:// 直接開檔時，瀏覽器不允許網頁自動讀取同資料夾的 data.json。';
     el.classList.add('rd-error');
     el.innerHTML=`<span>${why}</span>`
-      +`<label class="rd-pick">選擇 data.json${LOAD_PLATFORM ? '（可一併選 data-platform.json）' : ''}<input type="file" multiple accept=".json,.jsonc,application/json"></label>`
+      +`<label class="rd-pick">選擇 data.json（可一併選 data-que.json${LOAD_PLATFORM ? '、data-platform.json' : ''}）<input type="file" multiple accept=".json,.jsonc,application/json"></label>`
       +(local ? '<span>或改用本機伺服器開啟（例如 VS Code Live Server）。</span>' : '');
     el.querySelector('input').addEventListener('change',e=>{
       if(e.target.files.length) loadFromPicker(e.target.files).then(start).catch(showError);
     });
   }
 
-  function start({ raw, platform, platformError }){
+  function start({ raw, platform, platformError, que, queError }){
     build(raw,platform,platformError);
+    RD.que=que || null;
+    RD.queError=queError || null;
     initDateInputs();
     const monthSel=document.getElementById('commandCompareMonth');
     if(monthSel){ compareState.month=Number(RD.asOf.slice(5,7)); monthSel.value=String(compareState.month); }
@@ -24404,6 +25163,9 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
     renderComparison();
     renderUsage();
     if(typeof renderAiScatter==='function') renderAiScatter();
+    /* 平台導入成效分析（qa-adoption）：問卷有問題只影響那一頁 */
+    try{ RD.adoption?.start(); }
+    catch(err){ console.error('[qa-adoption]',err); RD.que=null; RD.queError=`畫面產生失敗（${err.message || err}）`; }
     renderStatus();
     document.documentElement.classList.add('rd-ready');
   }
@@ -24416,5 +25178,589 @@ html:not(.rd-ready) .dashboard .page{ visibility:hidden; }
   /* file:// 下 fetch 一定被擋（還會在 console 留一串 CORS 錯誤），直接改用手動選檔 */
   if(location.protocol==='file:') showError(null);
   else loadFromServer().then(start).catch(showError);
+})();
+</script>
+
+<script id="qa-adoption">
+/* =========================================================================
+   qa-adoption：平台導入成效分析（原型 v10 新頁 #adoption）接真實資料
+   ・問卷：同資料夾的 data-que.json（教育訓練課後問卷，schemaVersion 1；格式見 data-que.template.jsonc、DATA_CONTRACT.md 第 9 節）。
+     qa-data 負責載入（RD.que、RD.queError），這裡檢查、計算、繪製；qa-data 的 start() 呼叫 RD.adoption.start()，
+     renderStatus() 把 RD.adoption.warnings() 放進頁首。問卷沒載入時只有這頁顯示「尚無問卷資料」，其他頁照常。
+   ・場次：data-que.json 的 sessions（場次清單的日期、上午／下午、單位名稱）；單位分析＝填答者自填的就職單位（使用者 2026-11-13 決定，
+     不用場次清單的單位類別）。
+   ・平台：RD.cases（data.json，平台起始日 2026/10/05 起）。處理時效只用緊急醫療（得知受理↔完成派案、得知處理方式↔完成受理方式表單、
+     醫師出勤日↔實際出勤時間，使用者確認）；轉介滿意度用全部通報的滿意度問卷（與通報者頁相同）。
+     平台的單位＝通報者所屬網絡：衛政、社政、消防照名稱，其餘網絡（含未填）算「其他」。
+   ・日期：問卷以場次日期、平台以通報日。快速鍵以 data.json 的資料日（RD.asOf）為今天；課程早於平台起始日，
+     這頁不套 PLATFORM_START，最早可選到最早場次那年的 1/1。啟用前的問卷基準不受日期篩選。
+   ・版面、元件、配色與原型 v10 相同（<style id="v10-adoption">）；同意程度是 100% 堆疊橫條（不要發散式、不要中線）。
+   ========================================================================= */
+(()=>{
+  'use strict';
+  const RD=window.RD;
+  if(!RD) return;
+  const QUE_SCHEMA_VERSION=1;
+  const HOUR=3600000;
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const pad=n=>String(n).padStart(2,'0');
+
+  /* ---------- 問卷題目與選項（照 Google 表單；data-que.json 只放代碼） ---------- */
+  const UNIT_OF_CODE={ health:'衛政', social:'社政', fire:'消防', other:'其他' };
+  const UNITS=['衛政','社政','消防','其他'];
+  const SLOT_LABEL={ am:'上午', pm:'下午' };
+  const ITEMS=[
+    {key:'ui', label:'系統介面設計', full:'系統介面設計之整體滿意度（包括：圖示／按鍵功能辨識、資訊排版、設計美感等）'},
+    {key:'fit', label:'功能符合實務需求', full:'系統功能設計符合我的工作實務需求'},
+    {key:'course', label:'課程內容、講師與教材', full:'對於本次課程內容、講師說明及教材之整體滿意度'},
+    {key:'flow', label:'系統操作流程', full:'系統操作流程之整體滿意度（包括：操作直覺性、使用流暢度、步驟明確等）'},
+  ];
+  const BENEFITS=[
+    {key:'efficiency', label:'提升跨單位通報與轉介效率', full:'本平台有效提升跨單位通報與轉介效率'},
+    {key:'paperless', label:'自動化與個案追蹤，簡化紙本作業', full:'系統自動化與個案追蹤功能，有助於簡化紙本作業'},
+    {key:'quality', label:'完整掌握處置結果，提升照護品質', full:'透過本平台更能完整掌握個案處置結果，提升照護品質'},
+    {key:'adopt', label:'樂意用於日常工作', full:'我樂意將此平台應用於未來的日常工作中'},
+  ];
+  /* 同意程度 1–5：由不同意到同意（畫圖的左右順序）。配色：同意端藍、不同意端橘、普通灰，兩臂同亮度；色塊內文字依 APCA 選白或深色 */
+  const LIKERT=[
+    {key:'sd', value:1, label:'非常不同意', color:'#a34d15', ink:'#ffffff'},
+    {key:'d', value:2, label:'不同意', color:'#ec905e', ink:'#1f2a3a'},
+    {key:'n', value:3, label:'普通', color:'#c9ced6', ink:'#1f2a3a'},
+    {key:'a', value:4, label:'同意', color:'#67b0fa', ink:'#1f2a3a'},
+    {key:'sa', value:5, label:'非常同意', color:'#206bb0', ink:'#ffffff'},
+  ];
+  const LIKERT_OF_VALUE=Object.fromEntries(LIKERT.map(l=>[l.value,l.key]));
+  /* 推廣挑戰：表單的三個選項＋「其他」自由填寫（轉檔時歸成 other／none） */
+  const CHALLENGES=[
+    {key:'process', label:'需改變現有作業流程，變得較為複雜'},
+    {key:'duplicate', label:'與現有單位內部系統流程重複輸入'},
+    {key:'complex', label:'系統操作複雜，同仁學習成本高'},
+    {key:'other', label:'其他（自由填寫）', residual:true},
+    {key:'none', label:'無／尚無法判斷', residual:true},
+  ];
+  /* 建議意見：自由填寫，轉檔時依關鍵字歸類（暫定），一則可以屬於多類 */
+  const SUGGESTIONS=[
+    {key:'manual', label:'教學影片、操作手冊、QA'},
+    {key:'integrate', label:'系統介接、報表、避免重複登打'},
+    {key:'font', label:'字體放大、畫面簡化'},
+    {key:'upload', label:'上傳同意書或附件'},
+    {key:'permission', label:'權限、資安與瀏覽範圍'},
+    {key:'other', label:'其他建議', residual:true},
+  ];
+  /* 處理時效區間：一個色相由淺到深（時間越長越深，ordinal 檢查通過）；「無法得知」用中性灰 */
+  const BUCKETS=[
+    {key:'d0', label:'24 小時內', color:'#67bdff', ink:'#1f2a3a'},
+    {key:'d1', label:'1–3 天', color:'#419ffa', ink:'#ffffff'},
+    {key:'d4', label:'4–7 天', color:'#1d83db', ink:'#ffffff'},
+    {key:'d8', label:'8–10 天', color:'#0067bd', ink:'#ffffff'},
+    {key:'d11', label:'11 天以上', color:'#004f9e', ink:'#ffffff'},
+    {key:'unknown', label:'無法得知', color:'#b8c0cb', ink:'#1f2a3a'},
+  ];
+  const BUCKET_KEYS=BUCKETS.map(b=>b.key);
+  const TIMING=[
+    {key:'ack', label:'通報 → 得知受理', field:'assignH',
+     survey:'平台啟用前，從開始通報（聯繫衛政或醫療），到得知受理（回覆會處理），平均需要多久時間',
+     platform:'網絡完成通報 → 完成指派醫師／護理師'},
+    {key:'method', label:'通報 → 得知處理方式', field:'acceptH',
+     survey:'平台啟用前，從開始聯繫（衛政或醫療），到得知處理方式（電訪或決定出勤日），平均需要多久時間',
+     platform:'網絡完成通報 → 首次完成「受理方式」表單'},
+    {key:'visit', label:'通報 → 醫師出勤', field:'outsideH',
+     survey:'平台啟用前，從開始聯繫（衛政或醫療），到醫師出勤日，平均需要多久時間',
+     platform:'網絡完成通報 → 實際出勤時間（只算出勤的案件）'},
+  ];
+  const RESULTS=[
+    {key:'passive', label:'被動獲知（需要自己詢問才能知道）'},
+    {key:'active', label:'主動被告知（會收到訊息或通知）'},
+    {key:'none', label:'無法獲知'},
+  ];
+  const NETWORK_UNIT={ health:'衛政', social:'社政', fire:'消防' };
+
+  /* ---------- 資料（start() 時由 RD 產生） ---------- */
+  let SESSIONS=[], RESPONSES=[], CASES=[], SAT=[];
+  let surveyError=null, problems={};
+  let TODAY=null, YEAR_START=null, PRESETS={};
+  const state={view:'training',start:null,end:null,unit:'all'};
+
+  const isDay=v=>typeof v==='string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const score5=v=>Number.isInteger(v) && v>=1 && v<=5 ? v : null;
+  const codes=(list,known,miss)=>{
+    if(!Array.isArray(list)) return [];
+    const out=[];
+    list.forEach(v=>{ if(known.includes(v)){ if(!out.includes(v)) out.push(v); } else problems[miss]=(problems[miss]||0)+1; });
+    return out;
+  };
+  function buildSurvey(){
+    SESSIONS=[]; RESPONSES=[]; surveyError=null; problems={};
+    const raw=RD.que;
+    if(!raw){ surveyError=RD.queError || '沒有 data-que.json'; return; }
+    if(typeof raw!=='object' || Array.isArray(raw)){ surveyError='data-que.json 的最外層不是物件'; return; }
+    if(raw.schemaVersion!==QUE_SCHEMA_VERSION){ surveyError=`data-que.json 的 schemaVersion 是 ${raw.schemaVersion}，這版儀表板支援 ${QUE_SCHEMA_VERSION}`; return; }
+    if(!Array.isArray(raw.sessions) || !Array.isArray(raw.responses)){ surveyError='data-que.json 沒有 sessions 或 responses 陣列'; return; }
+    const byId=new Map();
+    raw.sessions.forEach(s=>{
+      if(!s || typeof s.id!=='string' || !isDay(s.date) || !SLOT_LABEL[s.slot] || byId.has(s.id)){ problems.badSession=(problems.badSession||0)+1; return; }
+      byId.set(s.id,{ id:s.id, date:s.date, slot:s.slot, org:typeof s.org==='string' && s.org.trim() ? s.org.trim() : null });
+    });
+    raw.responses.forEach(r=>{
+      const s=r && byId.get(r.session);
+      if(!s){ problems.noSession=(problems.noSession||0)+1; return; }
+      let unit=UNIT_OF_CODE[r.unit];
+      if(!unit){ problems.badUnit=(problems.badUnit||0)+1; unit='其他'; }
+      const scores={}, benefit={};
+      ITEMS.forEach(it=>{ scores[it.key]=score5(r.scores?.[it.key]); });
+      BENEFITS.forEach(b=>{ benefit[b.key]=LIKERT_OF_VALUE[score5(r.benefit?.[b.key])] || null; });
+      let pre=null;
+      if(r.pre && typeof r.pre==='object'){
+        const p=r.pre, bucket=v=>BUCKET_KEYS.includes(v) ? v : null;
+        pre={ referred:p.referred===true ? true : p.referred===false ? false : null,
+          ack:bucket(p.ack), method:bucket(p.method), visit:bucket(p.visit),
+          result:RESULTS.some(o=>o.key===p.result) ? p.result : null, satisfaction:score5(p.satisfaction) };
+      }
+      RESPONSES.push({ session:s.id, date:s.date, unit, scores, benefit,
+        challenges:codes(r.challenges,CHALLENGES.map(c=>c.key),'badCode'),
+        suggestions:codes(r.suggestions,SUGGESTIONS.map(c=>c.key),'badCode'), pre });
+    });
+    SESSIONS=[...byId.values()].filter(s=>RESPONSES.some(r=>r.session===s.id))
+      .sort((a,b)=>a.date.localeCompare(b.date) || a.slot.localeCompare(b.slot));
+  }
+  const networkUnit=code=>NETWORK_UNIT[code] || '其他';
+  const hours=(a,b)=>a==null || b==null || b<a ? null : (b-a)/HOUR;
+  function buildPlatform(){
+    const cases=Array.isArray(RD.cases) ? RD.cases : [];
+    CASES=cases.filter(c=>c.kind==='emg').map(c=>({ day:c.day, unit:networkUnit(c.network),
+      assignH:hours(c.reported,c.assigned), acceptH:hours(c.reported,c.intake), outsideH:hours(c.reported,c.dispatched) }));
+    SAT=cases.map(c=>({ day:c.day, unit:networkUnit(c.network),
+      scores:(c.surveys || []).filter(s=>s.completed).flatMap(s=>s.scores).filter(v=>Number.isFinite(v)) }));
+  }
+  function initDates(){
+    const last=SESSIONS.length ? SESSIONS[SESSIONS.length-1].date : null;
+    TODAY=[RD.asOf,last].filter(isDay).sort().pop() || new Date().toISOString().slice(0,10);
+    const first=[SESSIONS[0]?.date,RD.dataStart,TODAY].filter(isDay).sort()[0];
+    YEAR_START=`${first.slice(0,4)}-01-01`;
+    const [y,m]=TODAY.split('-').map(Number);
+    PRESETS={ month:[`${y}-${pad(m)}-01`,TODAY], quarter:[`${y}-${pad(Math.floor((m-1)/3)*3+1)}-01`,TODAY], year:[`${y}-01-01`,TODAY] };
+    ['#adoptionStartDate','#adoptionEndDate'].forEach(sel=>{ const input=$(sel); if(input){ input.min=YEAR_START; input.max=TODAY; } });
+  }
+
+  /* ---------- 篩選 ---------- */
+  const inRange=d=>d>=state.start && d<=state.end;
+  const unitOk=u=>state.unit==='all' || u===state.unit;
+  const responses=()=>RESPONSES.filter(r=>inRange(r.date) && unitOk(r.unit));
+  const baseline=()=>RESPONSES.filter(r=>r.pre && r.pre.referred===true && unitOk(r.unit));
+  const cases=()=>CASES.filter(c=>inRange(c.day) && unitOk(c.unit));
+  const satCases=()=>SAT.filter(c=>inRange(c.day) && unitOk(c.unit));
+
+  /* ---------- 格式 ---------- */
+  const DASH='—';
+  const fmtScore=v=>Number.isFinite(v) ? v.toFixed(2) : DASH;
+  const fmtPct=v=>Number.isFinite(v) ? `${v.toFixed(1)}%` : DASH;
+  const fmtPct0=v=>Number.isFinite(v) ? `${Math.round(v)}%` : DASH;
+  const fmtDate=d=>d ? d.replace(/-/g,'/') : DASH;
+  const mean=arr=>arr.length ? arr.reduce((s,v)=>s+v,0)/arr.length : NaN;
+  const bucketOf=h=>{ const d=Math.floor(h/24); return d<1?'d0':d<4?'d1':d<8?'d4':d<11?'d8':'d11'; };
+  const sessionLabel=s=>`${fmtDate(s.date)} ${SLOT_LABEL[s.slot]}`;
+  const shortOrg=o=>o ? o.replace(/^(臺|台)北市政府(衛生局)?/,'') : null;
+  const allScores=rs=>rs.flatMap(r=>ITEMS.map(it=>r.scores[it.key])).filter(v=>v!=null);
+  const noSurvey=()=>surveyError ? '尚無問卷資料（data-que.json 未載入）' : null;
+
+  /* ---------- DOM 小工具（資料文字一律 textContent） ---------- */
+  const el=(tag,cls,text)=>{ const n=document.createElement(tag); if(cls) n.className=cls; if(text!=null) n.textContent=text; return n; };
+  const tipData=new WeakMap();
+  const setTip=(node,title,rows)=>{
+    tipData.set(node,{title,rows});
+    node.tabIndex=0;
+    node.setAttribute('aria-label',[title,...rows.map(([v,l])=>`${l} ${v}`)].join('，'));
+  };
+  const empty=(box,text)=>{ box.replaceChildren(el('p','adoption-v10-empty',text)); };
+
+  /* 一列：名稱（＋小字）｜長條｜數值。meter＝有軌道（對滿分），rank＝依最大值縮放 */
+  const barRow=({name,small,ratio,value,valueSmall,kind,title,tip})=>{
+    const row=el('div',`adoption-v10-row ${kind==='meter'?'is-meter':'is-rank'}`);
+    const nameBox=el('span','adoption-v10-row-name',name);
+    if(small) nameBox.append(el('small',null,small));
+    const track=el('span','adoption-v10-track');
+    const fill=el('i');
+    fill.style.width=`${Math.min(100,Math.max(0,ratio*100)).toFixed(2)}%`;
+    track.append(fill);
+    const val=el('b','adoption-v10-row-value',value);
+    if(valueSmall) val.append(el('small',null,valueSmall));
+    row.append(nameBox,track,val);
+    setTip(row,title||name,tip||[[value,'']]);
+    return row;
+  };
+
+  /* 100% 堆疊橫條：segments=[{label,share(0–1),color,ink,count}]；色塊之間 2px 白色間隔，放得下才印百分比 */
+  const stackBar=(segments,title,extra)=>{
+    const bar=el('div','adoption-v10-stack');
+    segments.filter(s=>s.share>0).forEach(s=>{
+      const seg=el('span','adoption-v10-seg');
+      seg.style.width=`${(s.share*100).toFixed(3)}%`;
+      seg.style.background=s.color;
+      seg.style.color=s.ink;
+      seg.append(el('em',null,fmtPct0(s.share*100)));
+      setTip(seg,title,[[fmtPct(s.share*100),s.label],[`${s.count}`,extra||'人']]);
+      bar.append(seg);
+    });
+    return bar;
+  };
+  const legend=(box,items)=>{
+    box.replaceChildren(...items.map(it=>{
+      const li=el('span','adoption-v10-legend-item');
+      const sw=el('i');
+      sw.style.background=it.color;
+      li.append(sw,document.createTextNode(it.label));
+      return li;
+    }));
+  };
+
+  /* ---------- 子頁籤 1：教育訓練滿意度 ---------- */
+  function renderTraining(){
+    const rs=responses();
+    const sessions=SESSIONS.filter(s=>rs.some(r=>r.session===s.id));
+    const scores=allScores(rs);
+    $('#adoptionKpiSessions').textContent=rs.length ? `${sessions.length} 場` : DASH;
+    $('#adoptionKpiResponses').textContent=rs.length ? `${rs.length} 人` : DASH;
+    $('#adoptionKpiScore').textContent=scores.length ? `${fmtScore(mean(scores))} 分` : DASH;
+    $('#adoptionKpiTop').textContent=scores.length ? fmtPct(scores.filter(v=>v>=4).length/scores.length*100) : DASH;
+
+    const sessionBox=$('#adoptionSessionList');
+    if(!rs.length) empty(sessionBox,noSurvey() || '此區間沒有教育訓練場次');
+    else sessionBox.replaceChildren(...sessions.map(s=>{
+      const list=rs.filter(r=>r.session===s.id);
+      const avg=mean(allScores(list));
+      const units=UNITS.map(u=>[u,list.filter(r=>r.unit===u).length]).filter(([,n])=>n).map(([u,n])=>`${u} ${n}`).join('、');
+      const org=shortOrg(s.org);
+      return barRow({
+        name:sessionLabel(s),small:org ? `${org}｜${list.length} 人` : `${list.length} 人`,ratio:avg/5,value:fmtScore(avg),kind:'meter',
+        title:[sessionLabel(s),s.org,units].filter(Boolean).join('｜'),
+        tip:[[fmtScore(avg),'總滿意度'],...ITEMS.map(it=>[fmtScore(mean(list.map(r=>r.scores[it.key]).filter(v=>v!=null))),it.label]),[`${list.length} 人`,'填答']],
+      });
+    }));
+
+    const itemBox=$('#adoptionItemList');
+    if(!rs.length) empty(itemBox,noSurvey() || '此區間沒有問卷資料');
+    else itemBox.replaceChildren(...ITEMS.map(it=>{
+      const vals=rs.map(r=>r.scores[it.key]).filter(v=>v!=null);
+      const avg=mean(vals);
+      const dist=[5,4,3,2,1].map(k=>[`${vals.filter(v=>v===k).length} 人`,`${k} 分`]);
+      return barRow({name:it.label,ratio:avg/5,value:fmtScore(avg),kind:'meter',title:it.full,tip:[[fmtScore(avg),'平均分'],...dist]});
+    }));
+
+    const unitBox=$('#adoptionUnitList');
+    const units=UNITS.filter(u=>rs.some(r=>r.unit===u));
+    if(!units.length) empty(unitBox,noSurvey() || '此區間沒有問卷資料');
+    else unitBox.replaceChildren(...units.map(u=>{
+      const list=rs.filter(r=>r.unit===u);
+      const avg=mean(allScores(list));
+      return barRow({name:u,small:`${list.length} 人`,ratio:avg/5,value:fmtScore(avg),kind:'meter',title:`${u}｜總滿意度`,tip:[[fmtScore(avg),'總滿意度'],[`${list.length} 人`,'填答']]});
+    }));
+  }
+
+  /* ---------- 子頁籤 2：預期效益與推廣挑戰 ---------- */
+  function renderBenefit(){
+    const rs=responses();
+    const n=rs.length;
+    legend($('#adoptionLikertLegend'),LIKERT);
+    const likertBox=$('#adoptionLikert');
+    if(!n) empty(likertBox,noSurvey() || '此區間沒有問卷資料');
+    else{
+      /* 100% 堆疊橫條：每題一列，由左到右非常不同意→非常同意，分母是該題作答人數，每列合計 100%，各列等長、兩端對齊 */
+      likertBox.replaceChildren(...BENEFITS.flatMap(b=>{
+        const counts=Object.fromEntries(LIKERT.map(l=>[l.key,rs.filter(r=>r.benefit[b.key]===l.key).length]));
+        const answered=LIKERT.reduce((s,l)=>s+counts[l.key],0);
+        if(!answered) return [];
+        const row=el('div','adoption-v10-likert-row');
+        const name=el('span','adoption-v10-row-name',b.label);
+        const bar=stackBar(LIKERT.map(l=>({label:l.label,share:counts[l.key]/answered,color:l.color,ink:l.ink,count:counts[l.key]})),b.full,'人');
+        const val=el('b','adoption-v10-row-value',fmtPct((counts.a+counts.sa)/answered*100));
+        val.append(el('small',null,'同意以上'));
+        row.append(name,bar,val);
+        return [row];
+      }));
+    }
+
+    const challengeBox=$('#adoptionChallengeList');
+    if(!n) empty(challengeBox,noSurvey() || '此區間沒有問卷資料');
+    else{
+      const counts=CHALLENGES.map(c=>({c,count:rs.filter(r=>r.challenges.includes(c.key)).length}));
+      const fixed=counts.filter(x=>!x.c.residual).sort((a,b)=>b.count-a.count);
+      const tail=counts.filter(x=>x.c.residual);
+      const max=Math.max(1,...counts.map(x=>x.count));
+      challengeBox.replaceChildren(...[...fixed,...tail].map(({c,count})=>barRow({
+        name:c.label,small:`${count} 人`,ratio:count/max,value:fmtPct(count/n*100),kind:'rank',
+        title:c.label,tip:[[fmtPct(count/n*100),'勾選人數占填答人數'],[`${count} / ${n} 人`,'勾選']],
+      })));
+    }
+
+    const suggestionBox=$('#adoptionSuggestionList');
+    const note=$('#adoptionSuggestionNote');
+    if(!n){ empty(suggestionBox,noSurvey() || '此區間沒有問卷資料'); note.textContent=''; }
+    else{
+      const counts=SUGGESTIONS.map(s=>({s,count:rs.filter(r=>r.suggestions.includes(s.key)).length}));
+      const fixed=counts.filter(x=>!x.s.residual).sort((a,b)=>b.count-a.count);
+      const tail=counts.filter(x=>x.s.residual);
+      const max=Math.max(1,...counts.map(x=>x.count));
+      suggestionBox.replaceChildren(...[...fixed,...tail].map(({s,count})=>barRow({
+        name:s.label,small:`${count} 人`,ratio:count/max,value:fmtPct(count/n*100),kind:'rank',
+        title:s.label,tip:[[fmtPct(count/n*100),'占填答人數'],[`${count} / ${n} 人`,'提出']],
+      })));
+      const none=rs.filter(r=>!r.suggestions.length).length;
+      note.textContent=`沒有提出建議（填「無」「暫無」等）：${none} 人（${fmtPct(none/n*100)}）`;
+    }
+  }
+
+  /* ---------- 子頁籤 3：啟用前後比較 ---------- */
+  function renderCompare(){
+    const base=baseline();
+    const cs=cases();
+    legend($('#adoptionBucketLegend'),BUCKETS);
+    $('#adoptionTimingSub').textContent=`啟用前＝問卷「曾經轉介」者 ${base.length} 人（不受日期篩選）；平台＝${fmtDate(platformStart())}－${fmtDate(state.end)}通報的緊急醫療案件`;
+    const timingBox=$('#adoptionTiming');
+    timingBox.replaceChildren(...TIMING.map(t=>{
+      const group=el('section','adoption-v10-timing-group');
+      const head=el('header');
+      const title=el('b',null,t.label);
+      const sub=el('span',null,`平台：${t.platform}`);
+      const preList=base.map(r=>r.pre[t.key]).filter(Boolean);
+      const hrs=cs.map(c=>c[t.field]).filter(v=>v!=null);
+      const postList=hrs.map(bucketOf);
+      const share=(list,k)=>list.length ? list.filter(v=>v===k).length/list.length : NaN;
+      const pre24=share(preList,'d0')*100, post24=share(postList,'d0')*100;
+      const headline=el('em');
+      headline.append(document.createTextNode('24 小時內 '),el('strong',null,fmtPct0(pre24)),document.createTextNode(' → '),el('strong',null,fmtPct0(post24)));
+      head.append(title,sub,headline);
+      const mkRow=(name,small,list,unitWord,emptyText)=>{
+        const row=el('div','adoption-v10-stack-row');
+        const nameBox=el('span','adoption-v10-row-name',name);
+        nameBox.append(el('small',null,small));
+        if(!list.length){ row.append(nameBox,el('span','adoption-v10-empty inline',emptyText)); return row; }
+        const segs=BUCKETS.map(b=>({label:b.label,share:share(list,b.key),color:b.color,ink:b.ink,count:list.filter(v=>v===b.key).length}));
+        row.append(nameBox,stackBar(segs,`${t.label}｜${name}`,unitWord));
+        return row;
+      };
+      const avg=mean(hrs);
+      group.append(head,
+        mkRow('啟用前',`問卷 ${preList.length} 人`,preList,'人',noSurvey() || '尚無資料'),
+        mkRow('平台',hrs.length ? `${hrs.length} 件｜平均 ${avg<10?avg.toFixed(1):Math.round(avg)} 小時` : '0 件',postList,'件','此區間沒有完成這一步的案件'));
+      return group;
+    }));
+
+    const resultBox=$('#adoptionResultList');
+    const answered=base.filter(r=>r.pre.result);
+    if(!answered.length) empty(resultBox,noSurvey() || '沒有回答「曾經轉介」的填答者');
+    else{
+      const counts=RESULTS.map(o=>({o,count:answered.filter(r=>r.pre.result===o.key).length})).sort((a,b)=>b.count-a.count);
+      const max=Math.max(1,...counts.map(x=>x.count));
+      resultBox.replaceChildren(...counts.map(({o,count})=>barRow({
+        name:o.label,small:`${count} 人`,ratio:count/max,value:fmtPct(count/answered.length*100),kind:'rank',
+        title:o.label,tip:[[fmtPct(count/answered.length*100),'占曾經轉介者'],[`${count} / ${answered.length} 人`,'回答']],
+      })));
+    }
+
+    const satBox=$('#adoptionSatisfaction');
+    const preScores=base.map(r=>r.pre.satisfaction).filter(v=>v!=null);
+    const pre=mean(preScores);
+    const postScores=satCases().flatMap(c=>c.scores);
+    const post=mean(postScores);
+    const item=(label,value,small)=>{
+      const box=el('div','adoption-v10-pair-item');
+      box.append(el('span',null,label),el('strong',null,fmtScore(value)),el('small',null,small));
+      return box;
+    };
+    const pair=el('div','adoption-v10-pair-row');
+    pair.append(item('啟用前（問卷）',pre,`曾經轉介 ${preScores.length} 人`),el('span','adoption-v10-pair-arrow','→'),item('平台使用者滿意度',post,`已回收 ${postScores.length} 份`));
+    pair.lastChild.previousSibling.setAttribute('aria-hidden','true');
+    const delta=post-pre;
+    const deltaBox=el('p',`adoption-v10-delta ${delta>=0?'up':'down'}`);
+    if(Number.isFinite(delta)){
+      deltaBox.append(el('span','adoption-v10-delta-icon',delta>=0?'▲':'▼'),document.createTextNode(`${delta>=0?'提高':'降低'} ${Math.abs(delta).toFixed(2)} 分`));
+      deltaBox.lastChild.previousSibling.setAttribute('aria-hidden','true');
+    }else deltaBox.textContent='資料不足，無法比較';
+    satBox.replaceChildren(pair,deltaBox);
+  }
+
+  /* ---------- 篩選說明、繪製 ---------- */
+  /* 平台資料從平台起始日（RD.dataStart，2026/10/05）才有：比較頁的平台期間以這天為下限 */
+  const platformStart=()=>RD.dataStart && state.start<RD.dataStart ? RD.dataStart : state.start;
+  function renderScope(){
+    const unit=state.unit==='all' ? '全部單位' : state.unit;
+    $('#adoptionScope').textContent=state.view==='compare'
+      ? `平台：${fmtDate(platformStart())}－${fmtDate(state.end)}通報｜啟用前：問卷基準｜${unit}`
+      : `問卷：${fmtDate(state.start)}－${fmtDate(state.end)}的場次｜${unit}`;
+  }
+  function render(){
+    if(!TODAY) return;
+    renderTraining();
+    renderBenefit();
+    renderCompare();
+    renderScope();
+    requestAnimationFrame(fitLabels);
+  }
+  /* 色塊放不下百分比就不印（數字仍在提示框與 aria-label） */
+  function fitLabels(){
+    $$('#adoption .adoption-v10-seg').forEach(seg=>{
+      const label=seg.querySelector('em');
+      if(!label) return;
+      label.hidden=false;
+      const room=seg.getBoundingClientRect().width;
+      if(!room) return;
+      label.hidden=label.scrollWidth+10>room;
+    });
+  }
+
+  function showView(view){
+    state.view=view;
+    $$('#adoptionViewTabs .outcome-v62-tab').forEach(btn=>{
+      const on=btn.dataset.adoptionView===view;
+      btn.classList.toggle('active',on);
+      btn.setAttribute('aria-selected',on?'true':'false');
+    });
+    $$('#adoption [data-adoption-panel]').forEach(panel=>{
+      const on=panel.dataset.adoptionPanel===view;
+      panel.classList.toggle('active',on);
+      panel.hidden=!on;
+    });
+    hideTip();
+    if(TODAY) renderScope();
+    requestAnimationFrame(fitLabels);
+  }
+  function applyRange(start,end,preset){
+    if(!TODAY) return;
+    if(start>end) [start,end]=[end,start];
+    state.start=start<YEAR_START ? YEAR_START : start>TODAY ? TODAY : start;
+    state.end=end>TODAY ? TODAY : end<YEAR_START ? YEAR_START : end;
+    $('#adoptionStartDate').value=state.start;
+    $('#adoptionEndDate').value=state.end;
+    $$('#adoptionQuickFilter button').forEach(btn=>btn.classList.toggle('active',btn.dataset.adoptionRange===preset));
+    render();
+  }
+
+  /* ---------- 提示框（滑鼠與鍵盤焦點相同內容；數值在前、名稱在後） ---------- */
+  let tipEl=null, tipFor=null;
+  function showTip(node,x,y){
+    const info=tipData.get(node);
+    if(!info || !tipEl) return;
+    if(tipFor!==node){
+      tipFor=node;
+      const title=el('div','adoption-v10-tip-title',info.title);
+      const rows=info.rows.map(([v,l])=>{
+        const row=el('div','adoption-v10-tip-row');
+        row.append(el('strong',null,v));
+        if(l) row.append(el('span',null,l));
+        return row;
+      });
+      tipEl.replaceChildren(title,...rows);
+    }
+    tipEl.hidden=false;
+    const w=tipEl.offsetWidth, h=tipEl.offsetHeight;
+    let left=x+14, top=y+14;
+    if(left+w>innerWidth-8) left=Math.max(8,x-w-14);
+    if(top+h>innerHeight-8) top=Math.max(8,y-h-14);
+    tipEl.style.left=`${left}px`;
+    tipEl.style.top=`${top}px`;
+  }
+  function hideTip(){ if(tipEl) tipEl.hidden=true; tipFor=null; }
+
+  /* ---------- 指標定義 ---------- */
+  const FILTER_NOTE=['篩選','日期以場次日期為準；單位是填答者在問卷自填的就職單位（衛政、社政、消防、其他）。'];
+  const DEFS={
+    sessions:{title:'各場次總滿意度',rows:[
+      ['教育訓練場次','依場次清單（日期、上午／下午、單位名稱）。問卷依填答日期對到當天的場次：當天只有一場就算那一場；有上午、下午兩場時，13:00 以前送出的算上午場。'],
+      ['總滿意度','四題 1–5 分（系統介面設計、系統功能符合實務需求、課程內容講師與教材、系統操作流程）全部作答的平均：所有作答分數加總 ÷ 作答題數。對應指標清單「教育訓練課程滿意度：所有填答總分數之平均分（依場次）」。'],
+      ['滿意占比','給 4、5 分的作答數 ÷ 全部作答數（四題合計）。'],
+      FILTER_NOTE,
+    ]},
+    items:{title:'各題平均分',rows:[...ITEMS.map(it=>[it.label,`「${it.full}」1–5 分的平均。`]),FILTER_NOTE]},
+    units:{title:'各單位總滿意度',rows:[['算法','依填答者在問卷自填的就職單位（衛政、社政、消防、其他）分組，各自計算總滿意度（四題全部作答的平均）。'],['篩選','日期以場次日期為準。']]},
+    benefit:{title:'平台使用預期效益',rows:[...BENEFITS.map(b=>[b.label,`「${b.full}」`]),['算法','各同意程度的人數 ÷ 該題作答人數，每列合計 100%；同意以上＝非常同意＋同意。長條由左到右是非常不同意到非常同意。'],FILTER_NOTE]},
+    challenges:{title:'推廣可能面臨的挑戰',rows:[['題目','「您認為未來在單位推廣或使用本系統時，可能面臨的最大挑戰是什麼？」（複選）'],['算法','各選項的勾選人數 ÷ 填答人數；一人可勾多項，合計會超過 100%。「其他」是自由填寫的內容，填「無」「目前還不知道」這類的算「無／尚無法判斷」。'],FILTER_NOTE]},
+    suggestions:{title:'建議意見歸類',rows:[['題目','「針對系統介面優化、操作流程改善，或未來補充教材（如教學影片／操作手冊），您有什麼建議？」'],['算法','自由填寫的內容依主題歸類（暫定，一則可屬於多類）後的人數 ÷ 填答人數；填「無」「暫無」的不列入。只顯示歸類後的人數，不顯示原文（原文可能指認到填答者）。'],FILTER_NOTE]},
+    timing:{title:'處理時效：啟用前 vs 平台',rows:[
+      ...TIMING.map(t=>[t.label,`啟用前：問卷「${t.survey}？」。平台：${t.platform}。`]),
+      ['區間','24 小時內、1–3 天、4–7 天、8–10 天、11 天以上（問卷的選項是 11–14 天）；問卷另有「無法得知」。平台的時間換成天數後捨去小數再分區間（例如 30 小時算 1 天，落在 1–3 天）。'],
+      ['範圍','啟用前：回答「曾經轉介」的填答者，不受日期篩選。平台：所選期間通報的緊急醫療案件（平台 2026/10/05 啟用），該時間點還沒完成的不列入。單位：問卷是填答者自填的就職單位；平台是通報者所屬網絡，衛政、社政、消防照名稱，其餘網絡算「其他」。'],
+    ]},
+    result:{title:'通報後得知處遇結果',rows:[['題目','「平台啟用前，通報後會得知醫療的處遇結果嗎？」'],['算法','各選項人數 ÷ 回答這題的「曾經轉介」填答者，不受日期篩選。'],['平台啟用後','個案結案當日由系統通知通報者，並發送滿意度問卷。']]},
+    satisfaction:{title:'轉介滿意度',rows:[['啟用前','問卷「平台啟用前，整體轉介滿意度如何」1–5 分的平均，只算回答「曾經轉介」的填答者，不受日期篩選。'],['平台','平台使用者滿意度調查（與「通報者基本資料分析」頁相同）：所選期間通報、已回收問卷的案件（緊急醫療與優化計畫），各份平均分再取平均。單位依通報者所屬網絡。']]},
+  };
+  function openInfo(key){
+    const def=DEFS[key];
+    const dialog=$('#adoptionInfoDialog');
+    if(!def || !dialog) return;
+    $('#adoptionInfoTitle').textContent=def.title;
+    $('#adoptionInfoBody').replaceChildren(...def.rows.flatMap(([dt,dd])=>[el('dt',null,dt),el('dd',null,dd)]));
+    try{ if(typeof dialog.showModal==='function'){ if(!dialog.open) dialog.showModal(); } else dialog.setAttribute('open',''); }
+    catch(_){ dialog.setAttribute('open',''); }
+  }
+
+  /* ---------- 頁首提示（qa-data 的 renderStatus() 讀） ---------- */
+  function warnings(){
+    const err=surveyError || (!RD.que && RD.queError);
+    if(err) return [`教育訓練問卷（平台導入成效分析）未載入：${err}`];
+    const p=problems, out=[
+      p.noSession && `場次對不到 ${p.noSession} 份`,
+      p.badSession && `場次格式錯誤 ${p.badSession} 筆`,
+      p.badUnit && `就職單位代碼對不到 ${p.badUnit} 份（算其他）`,
+      p.badCode && `挑戰或建議代碼對不到 ${p.badCode} 個`,
+    ].filter(Boolean);
+    return out.length ? [`教育訓練問卷：${out.join('、')}`] : [];
+  }
+
+  /* qa-data 載入資料後呼叫（file:// 重新選檔也會再呼叫一次） */
+  function start(){
+    buildSurvey();
+    buildPlatform();
+    initDates();
+    state.unit='all';
+    $$('#adoptionUnitFilter .risk-filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.adoptionUnit==='all'));
+    const [s,e]=PRESETS.year;
+    applyRange(s,e,'year');
+    showView(state.view);
+  }
+
+  function wire(){
+    const root=$('#adoption');
+    if(!root) return;
+    tipEl=$('#adoptionTooltip');
+    root.addEventListener('click',e=>{
+      const tab=e.target.closest('#adoptionViewTabs .outcome-v62-tab');
+      if(tab){ showView(tab.dataset.adoptionView); return; }
+      const quick=e.target.closest('#adoptionQuickFilter button[data-adoption-range]');
+      if(quick){ if(TODAY){ const [s,en]=PRESETS[quick.dataset.adoptionRange]; applyRange(s,en,quick.dataset.adoptionRange); } return; }
+      if(e.target.closest('#adoptionApplyRange')){
+        if(TODAY) applyRange($('#adoptionStartDate').value || YEAR_START,$('#adoptionEndDate').value || TODAY,null);
+        return;
+      }
+      const unit=e.target.closest('#adoptionUnitFilter .risk-filter-btn');
+      if(unit){
+        state.unit=unit.dataset.adoptionUnit;
+        $$('#adoptionUnitFilter .risk-filter-btn').forEach(b=>b.classList.toggle('active',b===unit));
+        render();
+        return;
+      }
+      const info=e.target.closest('.adoption-v10-info[data-adoption-info]');
+      if(info) openInfo(info.dataset.adoptionInfo);
+    });
+    root.addEventListener('pointermove',e=>{
+      const node=e.target.closest && e.target.closest('.adoption-v10-row, .adoption-v10-seg');
+      if(node && tipData.has(node)) showTip(node,e.clientX,e.clientY);
+      else hideTip();
+    });
+    root.addEventListener('pointerleave',hideTip);
+    root.addEventListener('focusin',e=>{
+      const node=e.target;
+      if(!tipData.has(node)) return;
+      const r=node.getBoundingClientRect();
+      showTip(node,r.left+Math.min(r.width,160),r.top+r.height/2);
+    });
+    root.addEventListener('focusout',hideTip);
+    addEventListener('scroll',hideTip,{passive:true});
+    if('ResizeObserver' in window) new ResizeObserver(()=>fitLabels()).observe(root);
+  }
+
+  RD.adoption={ start, warnings };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',wire,{once:true});
+  else wire();
 })();
 </script>

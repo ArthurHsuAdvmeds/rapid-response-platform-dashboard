@@ -4,12 +4,15 @@ qa 版儀表板（本 repo 的 `qa/`）要拿到什麼資料、放在哪裡、�
 平台專案怎麼撈資料不在這裡。
 
 - 儀表板網址：`https://arthurhsuadvmeds.github.io/rapid-response-platform-dashboard/qa/`
-- **兩個檔**，都放在 `qa/`、與 `qa/index.html` 同層：
+- **三個檔**，都放在 `qa/`、與 `qa/index.html` 同層：
 
   | 檔案 | 內容 | 格式版本 | 欄位範本 |
   | --- | --- | --- | --- |
   | `qa/data.json` | 緊急醫療 `emg[]`、優化計畫 `opt[]`，一筆通報一個物件 | `schemaVersion: 2` | [data.template.jsonc](data.template.jsonc) |
   | `qa/data-platform.json` | 醫院內控指標（SNQ）`snq`、平台使用率 `usage` 的彙總數字；AI模型預測準確率的預測比對 `ai` | `schemaVersion: 1` | [data-platform.template.jsonc](data-platform.template.jsonc) |
+  | `qa/data-que.json` | 教育訓練課後問卷：場次 `sessions[]`、一份問卷一個物件 `responses[]`（平台導入成效分析頁） | `schemaVersion: 1` | [data-que.template.jsonc](data-que.template.jsonc) |
+
+- **`data-que.json` 不是平台專案產生的**：問卷來自 Google 表單，目前由使用者本機的 `.tool/que_to_json.py` 轉出（第 9 節），平台專案不用、也不要動這個檔。
 
 - **AI 預測放在 `data-platform.json`，不在 `data.json`**（使用者 2026-11-11 指示）。
 - **qa 目前隱藏醫院內控指標、平台使用率（2026-11-11）與 AI模型預測準確率（2026-11-09），不讀 `data-platform.json`**：平台專案可以先只產生 `data.json`，`data-platform.json` 的格式（第 4 節）保留，恢復時照用。
@@ -35,7 +38,7 @@ qa 的資料比 prod 多（優化計畫、量表分數、HIS 比對結果），�
    - 標準 JSON（不要註解、不要結尾逗號）；`schemaVersion` 正確；`emg`、`opt` 是陣列；
    - 每筆都有 `reportId`（emg 與 opt 之間也不能重複）與可解析的 `timePoint.reportedAt`；`opt` 每筆都有 `optType`（1／2／3）；
    - 筆數不是 0，也沒有比上一版明顯變少（門檻由平台專案決定）。
-5. **只動 `qa/data.json`、`qa/data-platform.json`**（prod 期間另外照 prod 的規格產生 `prod/data.json`，見第 8 節），不改其他檔。
+5. **只動 `qa/data.json`、`qa/data-platform.json`**（prod 期間另外照 prod 的規格產生 `prod/data.json`，見第 8 節），不改其他檔（`qa/data-que.json` 由使用者另外產生）。
 6. **git**：push 前 `git pull --rebase`，被拒絕就重來，不要 force push；commit message 固定格式，例如 `qa data 2026-11-09 06:00（緊急醫療 406、優化計畫 782 筆）`、`qa platform data 2026-11-09 06:00`。
    用只對這個 repo 有寫入權的 deploy key；平台網址、帳密、token、log 一律不進 repo。
 7. **推完怎麼確認**：Actions 綠燈後打開 qa 儀表板，頁首的資料更新時間、案件數（緊急醫療／優化計畫）符合預期，沒有黃色提示。
@@ -48,7 +51,8 @@ qa 的資料比 prod 多（優化計畫、量表分數、HIS 比對結果），�
 - 大小：v2 每筆約 0.9 KB，每年約 400 筆 ≈ 0.35 MB，十年內都不用拆。
 - **為什麼是這兩個檔**：同一支程式、同一個來源（平台的通報資料）放同一個檔，用 `emg`／`opt` 分類；
   SNQ 與平台使用率另外抓、更新頻率可能不同，所以另開 `data-platform.json`（使用者指定）；AI 預測也放這個檔（使用者 2026-11-11 指定）。不依實體拆（人、量表、時間點、代碼表各一個檔只會多出 join）。
-  之後若有第三個來源，比照 `data-platform.json` 另開一個檔，外框同樣有 `schemaVersion`、`updatedAt`。
+  之後若有第三個來源，比照 `data-platform.json` 另開一個檔，外框同樣有 `schemaVersion`、`updatedAt`：
+  2026-11-13 教育訓練課後問卷就這樣另開 `data-que.json`（使用者指定，第 9 節）。
 
 ---
 
@@ -103,6 +107,7 @@ qa 的資料比 prod 多（優化計畫、量表分數、HIS 比對結果），�
 
 與 prod 相同：姓名、身分證字號、出生日期（只給年齡）、電話、地址文字、病歷號、帳號、通報人與醫護人員姓名、任何自由文字（備註、描述、處置紀錄）都不放。
 HIS 的身分證比對在平台專案做完，檔案裡只放比對後的次數；座標建議四捨五入到小數 3 位 ★；測試帳號建立的、已作廢的通報不要放。
+`data-que.json` 另外不放：填答者姓名、電子郵件、職務、送出的精確時間（只記到場次）、自由填寫的原文（「其他」挑戰與建議意見只放歸類後的代碼）。
 
 ---
 
@@ -142,6 +147,7 @@ HIS 的身分證比對在平台專案做完，檔案裡只放比對後的次數�
 | 通報者基本資料分析 | `reporterDepartment`、`status`、`StatisfactionAvg` |
 | 醫療機構端處理成效分析 | opt `hospital`、`closing`、`monthlyUse`；`his` |
 | 醫院內控指標(SNQ) | `data-platform.json` 的 `snq`（**qa 目前隱藏這頁**，不讀這個檔） |
+| 平台導入成效分析（原型 v10 新增） | `data-que.json` 全部；啟用前後比較的平台端另用 emg `reportedAt`、`assignedAt`、`acceptedAt`、`outsideAt`，全部通報的 `reporterDepartment`、`StatisfactionAvg` |
 | 指揮儀表板｜指揮板、結案率 | `reportedAt`、`status`、`assignedAt`、`optType` |
 | ｜同期比較 | 效率頁的所有欄位（近三年相同期間；平台 2026/10/05 以前的年份顯示「平台未啟用」，不需要補舊資料） |
 | ｜平台使用率 | `data-platform.json` 的 `usage`（**qa 目前隱藏這個子頁籤**，不讀這個檔） |
@@ -156,3 +162,23 @@ HIS 的身分證比對在平台專案做完，檔案裡只放比對後的次數�
 - 之後改格式：新增選填欄位不用改版號；改名、刪欄位、改代碼意義 → `schemaVersion` 加 1，先讓儀表板同時支援新舊版本並上線，平台再切換。每次都先改範本與這份文件。
 - v2 還沒有正式產出過，所以 V9 追加（2026-11-09）直接改在 v2、不加版號：`bureau.result` 的 `2` 改為轉介松德院區、`closing.referrals` 改放代碼、拿掉 `dataStart` 與 `options.referral`。
 - 同樣的理由，2026-11-11 把 AI 預測從 `data.json` 每筆通報的 `ai` 移到 `data-platform.json` 的 `ai.predictions`，兩個檔都不加版號。
+
+---
+
+## 9. data-que.json（教育訓練課後問卷，schemaVersion 1）
+
+給原型 v10 新增的「平台導入成效分析」頁（2026-11-13 接到 qa）。欄位見 [data-que.template.jsonc](data-que.template.jsonc)。
+
+- **怎麼產生**：使用者從 Google 表單匯出 xlsx（放本機 `kpi/training_que.xlsx`），連同場次清單（`kpi/org_type_training_que.xlsx`：日期、場次（上午／下午）、單位名稱、單位類別），
+  在 repo 根目錄執行 `uv run --no-project python -I .tool/que_to_json.py`，覆寫 `qa/data-que.json`。兩個 xlsx 含個資或原文，只留本機（`kpi/` 已 gitignore）。
+  加 `--report 路徑` 會把每則自由填寫內容的歸類結果寫到那個檔，給人工檢查（含原文，不要放進 repo）。
+- **場次**：依場次清單。問卷依送出日期對到當天的場次：當天只有一場就算那一場（不看送出時間：2026/9/11、10/6 各有 2、5 份在下午才送出，算上午場）；
+  當天有上午、下午兩場時，13:00 以前送出算上午場（上午課程常在 12:00 前後才收卷，例如 10/27 有 2 份 12:00 送出）。清單沒有的日期自動建一場（沒有單位名稱），轉檔時提醒。
+- **單位分析以問卷的「就職單位」為準**（衛政／社政／消防／其他，使用者 2026-11-13 決定）；場次清單的「單位類別」不讀，例如三總北投那場（處置醫院）的填答者多數自填「其他」。
+- **欄位依標題文字對應**，表單調整欄位順序不影響；選項文字對不到時轉檔會列出來。表單上有、但目前沒有收的題目（課程對熟悉平台有幫助、跨網絡協同幫助程度、分級權限安心）一有人作答，轉檔會提醒。
+- **自由填寫的歸類是暫定規則**（`.tool/que_to_json.py` 的 `CHALLENGE_NONE`、`SUGGESTION_RULES`）：挑戰的「其他」分成有具體挑戰（other）與無／尚無法判斷（none）；
+  建議意見依關鍵字分到教學影片／手冊／QA、系統介接／報表、字體與畫面、上傳、權限與資安，對不到的算其他，一則可以屬於多類。正式的歸類方式待確認。
+- **儀表板的檢查**：`schemaVersion` 不是 1、不是 JSON、沒有 `sessions`／`responses` → 這一頁顯示「尚無問卷資料」，頁首提示；
+  `session` 對不到、`unit` 或挑戰／建議代碼對不到 → 照算能算的部分（單位算「其他」、代碼略過），頁首提示件數。
+- **待確認**：建議意見的歸類由誰、依哪些主題；疑似看反量表方向的問卷（9/30 上午有 1 份滿意度四題都 1 分、預期效益卻全部非常同意）要不要排除（目前照算）；
+  「曾經轉介」那題較晚才加入表單、跳題沒有生效（回答「不曾轉介」的人仍會看到後續題目，畫面只算「曾經轉介」）。

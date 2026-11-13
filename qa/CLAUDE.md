@@ -1,18 +1,23 @@
-# qa — V9 版面接真實資料（驗證版）
+# qa — V9 版面＋V10 平台導入成效分析接真實資料（驗證版）
 
-把原型 v9（全部頁面、V9 的醫療機構端）改成由資料計算，給使用者驗證；驗證通過後再更新到 prod（第 6 節）。
+把原型 v9（全部頁面、V9 的醫療機構端）改成由資料計算，2026-11-13 再加上原型 v10 新增的「平台導入成效分析」頁；給使用者驗證，驗證通過後再更新到 prod（第 6 節）。
 
-- **資料格式與平台專案要做的事以 [DATA_CONTRACT.md](DATA_CONTRACT.md) 為準，欄位以 [data.template.jsonc](data.template.jsonc)、[data-platform.template.jsonc](data-platform.template.jsonc) 為準。**
+- **資料格式與平台專案要做的事以 [DATA_CONTRACT.md](DATA_CONTRACT.md) 為準，欄位以 [data.template.jsonc](data.template.jsonc)、[data-platform.template.jsonc](data-platform.template.jsonc)、[data-que.template.jsonc](data-que.template.jsonc) 為準。**
 - `data.json` 2026-11-11 起是使用者從平台取得的正式資料（同一天同步到 prod）；`data-platform.json` 還是虛構範例（`"sample": true`）。**不要手動改這兩個檔**。
+- `data-que.json` 是教育訓練課後問卷（真實資料，只有代碼與分數，沒有姓名、職務、時間、原文），**不要手動改**：由本機 `.tool/que_to_json.py` 從 `kpi/training_que.xlsx`（表單匯出）與 `kpi/org_type_training_que.xlsx`（場次清單）轉出，規則見 DATA_CONTRACT.md 第 9 節。
   `.tool/qa_sample_data.py` 可以重產兩個檔的虛構範例（固定種子，重跑結果相同，會覆寫正式資料）。範例的通報日都在 2026/10/05–11/09（約 210 件）；為了讓要等結案、追蹤的頁面也有數字可驗，優化計畫結案時間壓短，3／6 個月追蹤與 HIS 次數不檢查時間是否已到（正式資料剛上線時這些頁面會是「—」）。
 - **AI模型預測準確率先隱藏**（使用者 2026-11-09 指示）：主選單按鈕註解掉、`#ai` 加 `hidden`、≥1200px 主選單少一欄（`<style id="qa-data">`）。程式、HTML 都保留，恢復時照按鈕旁的註解還原（含 `SHOW_AI` 改 `true`）。
 - **AI 預測放在 `data-platform.json` 的 `ai.predictions`，不在 `data.json`**（使用者 2026-11-11 指示）：一筆預測一個物件（`date`、`predicted`、`actual`、`modelVersion`），不帶 `reportId`，跟通報不對應；`normalizeCase()` 不讀通報裡的 `ai`。
 - **指揮儀表板「同期比較」保留三年欄位，舊年份標示「平台未啟用」**（使用者 2026-11-11 決定。V9 追加時曾先隱藏：當時使用者回答「參考 prod 做法」，prod 沒有這個子頁籤）：
   比較期間整段早於平台起始日的年份，欄位照樣顯示，表頭「平台未啟用」、數字「—」、較去年「—」；期間跨過起始日的年份照算，表頭標「10/5 起」；表格上方註明平台啟用日。見第 3 節。
-- **醫院內控指標(SNQ)、指揮儀表板「平台使用率」先隱藏**（使用者 2026-11-11 指示；這兩處與 AI 頁讀 `data-platform.json`）：主選單與子頁籤按鈕註解掉、`#snq` 加 `hidden`，≥1200px 主選單由 9 欄改 7 欄（連同 AI 頁）。
+- **醫院內控指標(SNQ)、指揮儀表板「平台使用率」先隱藏**（使用者 2026-11-11 指示；這兩處與 AI 頁讀 `data-platform.json`）：主選單與子頁籤按鈕註解掉、`#snq` 加 `hidden`，≥1200px 主選單由 9 欄改 7 欄（連同 AI 頁）；
+  2026-11-13 加上平台導入成效分析後是 8 顆、8 欄（`<style id="qa-data">`；原型 v10 那段 10 欄的規則沒有搬過來）。
   `<script id="qa-data">` 的 `SHOW_PLATFORM=false`（SNQ、平台使用率）與 `SHOW_AI=false`（AI 頁）：兩個都是 `false` 就不抓 `data-platform.json`（檔案不存在也不會 404），選檔時選了也不用，頁首不顯示平台資料的提示與範例標籤；任一個 `true` 就抓（`LOAD_PLATFORM`）。
   `renderSnq()`／`renderUsage()`、HTML、範本、範例檔都保留；恢復時還原兩顆按鈕、拿掉 `#snq` 的 `hidden`、`SHOW_PLATFORM` 改 `true`、主選單欄數加 1。
 - **平台起始日固定 2026/10/05**（V9 追加）：`PLATFORM_START`，詳見第 3 節。只套用在 qa，原型的模擬日期不動（使用者決定）。
+- **平台導入成效分析（原型 v10 新頁）2026-11-13 接上 `data-que.json`**（使用者指示）。使用者的決定：
+  單位分析以問卷填答者自填的「就職單位」為準（衛政／社政／消防／其他），**不用場次清單的單位類別**；場次依場次清單（日期、上午／下午、單位名稱），
+  當天只有一場時不看送出時間（9/11、10/6 下午送出的 2、5 份算上午場）。課程早於平台起始日，這頁的日期不套 `PLATFORM_START`（平台端的期間仍從 10/05 起）。
 - 版面、疊層 CSS、各版補丁的注意事項見根目錄與 [../prototype/CLAUDE.md](../prototype/CLAUDE.md)；qa 包含 v9 以前的所有層。
 
 ---
@@ -26,14 +31,19 @@
 - **保留**：分頁切換、地圖模組（已是 prod 的真實案件版）、指揮板連線幾何（V7）、`v84` 響應式、`v86` 效率頁跳轉卡、`v5-dialog-behavior`、`v6` 手機下拉與長條橫向、`v7` 字級。
 - **HTML 補的掛點**：效率頁總覽風險列 `data-eff-n`／`data-eff-bar`、衛生局分流件數 `data-eff-count="replied|tsgh|songde|hold"`（松德院區的比率是 `data-eff-computed="songdeReferral"`）、暫不轉介原因 `#effBureauReasonBody`、SNQ 卡片 `data-snq-metric`、平台使用率 `#usageAsOf`、醫療機構端轉介選項 `#hospitalReferralSplit`；頁首加 `#rdStatus`。
 - **V9 追加**跟 v9 原型一起改的部分（文字、四項名稱、轉介率卡片一列一項不畫進度條、拿掉「定義待確認」）見 [../prototype/CLAUDE.md](../prototype/CLAUDE.md) 的 v9 注意事項；qa 另外改了代碼表、起始日、同期比較的未啟用年份、範本與規格。
+- **V10 的平台導入成效分析（2026-11-13）**：從 `prototype/v10/index.html` 搬來，其他 v10 的改動沒有（v10 只加了這一頁）：
+  主選單按鈕（指揮儀表板前）、`<section id="adoption">`（只改 HTML 註解與場次卡的說明文字）、`#adoptionInfoDialog`（`.dashboard` 外）、
+  `<style id="v10-adoption-filters">`、`<style id="v10-adoption">`（放在 `<style id="qa-data">` 前；拿掉 ≥1200px 主選單 10 欄那條）；
+  原型的 `<script id="v10-adoption-behavior">`（模擬資料）不搬，改寫成檔尾的 `<script id="qa-adoption">`。版面、元件、配色與原型相同。
 
 ---
 
 ## 2. 程式在哪
 
-全部在檔尾 `<style id="qa-data">` 與 `<script id="qa-data">`（`window.RD`）。
+全部在檔尾 `<style id="qa-data">` 與 `<script id="qa-data">`（`window.RD`）；平台導入成效分析在其後的 `<script id="qa-adoption">`（`RD.adoption`）。
 
-- **載入**：`loadFromServer()` 同時抓 `data.json` 與 `data-platform.json`（`SHOW_PLATFORM`、`SHOW_AI` 都是 `false` 時不抓，目前如此）；後者失敗只記在 `RD.platformError`，不中斷。file:// 用選檔，可以一次選兩個檔（依內容判斷是哪一個）。
+- **載入**：`loadFromServer()` 同時抓 `data.json`、`data-que.json` 與 `data-platform.json`（`SHOW_PLATFORM`、`SHOW_AI` 都是 `false` 時不抓，目前如此）；後兩個讀不到或格式錯只記在 `RD.queError`／`RD.platformError`，不中斷。
+  file:// 用選檔，可以一次選多個檔（依內容判斷：有 `emg`／`opt` 是 data.json、有 `responses` 是 data-que.json）。
   `buildPlatform()` 產生 `RD.platform`：`units`（平台使用率）、`months`（SNQ）、`ai`（`{ day, predicted, actual, version }`，預測或實測缺一的已排除）。
 - **`build()`**：接受 `schemaVersion` 1（prod 舊格式，只有 emg，方便拿正式資料對照）與 2；`normalizeCase(r,'emg'|'opt')` 轉成共用的案件物件；通報日早於 `PLATFORM_START` 的排除（計入 `RD.stats.beforeStart`）。
   **data.json 改欄位名或代碼時，只改 `normalizeCase()` 與檔頭代碼表**（含 `BUREAU_RESULT`：1 北投／2 松德／3 暫不轉介，`REFERRAL`：醫療資源轉介四項；`referralLabel()` 也接受直接寫選項名稱）。
@@ -46,7 +56,10 @@
 - **各頁**：`renderBasic`、`renderRisk`、`renderEfficiency`、`renderOutcome`（改善情況、評估表填寫狀況、後續醫療資源、個案明細 dialog）、`renderReporter`、
   `renderHospital`（V9 兩區、無法收案 dialog、指標計算說明 dialog）、`renderSnq`（月彙總）、`renderCommandFlow`、`renderClosure`、`renderComparison`、`renderUsage`。
   成效頁子頁籤、個案明細的篩選與排序、醫療機構端與 SNQ 的 dialog 開關也在這裡（原本的程式隨模擬資料一起刪了）。
-- **頁首狀態列** `renderStatus()`：資料更新時間、總案件數（緊急醫療／優化計畫，「2026/10/05 起」）、範例資料標籤、黃色提示（超過 48 小時未更新、平台資料未載入、早於起始日已排除、代碼對不到（含醫療資源轉介）、reportId 重複…）。
+- **頁首狀態列** `renderStatus()`：資料更新時間、總案件數（緊急醫療／優化計畫，「2026/10/05 起」）、範例資料標籤、黃色提示（超過 48 小時未更新、平台資料未載入、早於起始日已排除、代碼對不到（含醫療資源轉介）、reportId 重複、
+  教育訓練問卷未載入或場次／代碼對不到（`RD.adoption.warnings()`）…）。
+- **`qa-adoption`**：`start()` 由 `qa-data` 的 `start()` 呼叫（file:// 重新選檔會再呼叫）：`buildSurvey()` 檢查 `RD.que`、`buildPlatform()` 從 `RD.cases` 取平台端、`initDates()` 以 `RD.asOf` 為今天；
+  之後與原型 v10 相同（`render()` 依 `state` 重算三個子頁籤，提示框、指標定義 `DEFS`、`fitLabels()`）。問卷沒載入時三個子頁籤顯示「尚無問卷資料」，啟用前後比較的平台端照畫。
 
 ---
 
@@ -70,6 +83,9 @@ prod/CLAUDE.md 第 2、3 節的規則（待派／已派、初評風險取 CTRS�
 `comparePeriods()` 依 `PLATFORM_START` 標記：期間結束日早於起始日＝`disabled`（不計算，表頭「平台未啟用」、數字與較去年「—」、底色灰）；開始日早於、結束日不早於＝`partial`（照算，表頭「10/5 起」，本年度「10/5－M/D」）。
 有任一欄是這兩種時，表格上方註明「平台 2026/10/05 啟用，之前沒有資料」。以資料日 2026/11/09 為例：2024、2025 未啟用、2026 是 10/5－11/9；2029 年起三欄才都是完整期間 |
 | 指揮板 | 四類（緊急醫療、第一～三類）各自的狀態件數；類別件數占總通報、各狀態占該類別 |
+| 平台導入成效分析 | 問卷（`data-que.json`）以場次日期篩選、單位＝填答者自填的就職單位；日期最早到最早場次那年的 1/1，快速鈕以 `RD.asOf` 為今天（不套平台起始日）。總滿意度＝四題全部作答的平均（沒作答的題不算）。
+啟用前後比較：啟用前＝`pre.referred=true` 的問卷（不受日期篩選）；平台端是 `RD.cases`（期間從 10/05 起）：處理時效只用 emg，`assigned`、`intake`、`dispatched` 各自減 `reported`（缺值或順序顛倒不列入），換成天數捨去小數分區間；
+轉介滿意度＝期間內全部通報已回收的滿意度分數平均（同通報者頁）；平台端的單位＝通報者網絡，衛政、社政、消防照名稱，其餘（含未填）算「其他」 |
 
 ---
 
@@ -90,7 +106,10 @@ prod/CLAUDE.md 第 2、3 節的規則（待派／已派、初評風險取 CTRS�
 
 - 本機伺服器見根目錄 CLAUDE.md，開 `http://127.0.0.1:8771/rapid-response-platform-dashboard/qa/`。
 - 範例資料：`uv run --no-project python -I .tool/qa_sample_data.py`（repo 根目錄執行，覆寫 `qa/data.json`、`qa/data-platform.json`）。
-- 測別的資料不要改 `qa/` 的兩個檔：Playwright `page.route('**/qa/data.json', …)`／`'**/qa/data-platform.json'` 攔截。
+- 測別的資料不要改 `qa/` 的資料檔：Playwright `page.route('**/qa/data.json', …)`／`'**/qa/data-platform.json'`／`'**/qa/data-que.json'` 攔截。
+- 2026-11-13 平台導入成效分析驗過：全年 10 場／131 人／4.72 分／95.2%，篩選（本月沒有場次、本季 8 場、社政 2 場 10 人）、提示框、指標定義、手機下拉、
+  `data-que.json` 404 與格式錯（頁首提示、其他頁照常）、file:// 選檔（有選與沒選 data-que.json）；新頁 11 個尺寸沒有裁切；其他七頁在 6 個尺寸與改動前逐元素位置相同；
+  主選單 8 欄在 1200–1366 寬有 1–3 顆標題折兩行（按鈕高度不變、沒有溢出）。
   2026-11-09 驗過：範例資料、`data.template.jsonc`（含註解）、prod 的正式資料（schemaVersion 1）、`data-platform.json` 404。
 - 檢查：頁首狀態列、各頁數字、通報類別與日期切換、各 dialog；8 個尺寸（1920×1080 … 320×640）沒有比 v9 多出的文字裁切；console 只能有本機的 favicon 404。
 - 刻意用捲動的區塊：矮視窗的衛生局原因表、醫院端「本院處理時效」、成效頁評估表面板、指揮板同期比較表，以及手機上的衛生局原因表（表格最小寬度 540px，左右捲動）。
@@ -108,3 +127,4 @@ prod/CLAUDE.md 第 2、3 節的規則（待派／已派、初評風險取 CTRS�
 3. `qa/DATA_CONTRACT.md` 與兩個範本搬到 `prod/`，路徑 `qa/` 改 `prod/`，取代 prod 舊的規格；`prod/CLAUDE.md` 改寫成這份的內容。
 4. 平台專案改成把 v2 推到 `prod/`；`qa/` 的範例檔視需要保留作為下一輪驗證用。
 5. 若 AI 頁、醫院內控指標、平台使用率仍要隱藏，照最上方的作法保留（連同 `SHOW_PLATFORM=false`、`SHOW_AI=false`，平台專案就不用推 `data-platform.json`）。同期比較的未啟用年份跟著 `index.html` 一起過去，prod 不用另外處理。
+6. 平台導入成效分析要一起上 prod 時，`data-que.json` 與 `data-que.template.jsonc` 也搬到 `prod/`（`que_to_json.py` 的輸出路徑改 `prod/data-que.json`）；不上的話把主選單按鈕註解掉、`#adoption` 加 `hidden`、主選單欄數減 1。
