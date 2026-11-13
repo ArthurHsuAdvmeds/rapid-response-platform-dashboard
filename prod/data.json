@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "updatedAt": "2026-11-13T03:01:22+08:00",
+  "updatedAt": "2026-11-14T03:01:17+08:00",
   "emg": [
     {"reportId": "20261005121818", "reporterDepartment": 8, "caseInfo": {"county": "臺北市", "dict": "北投區", "longitude": 121.514, "latitude": 25.118, "gender": 20, "age": 76}, "assess": {"CTRS": 0, "GAF": 2, "BSRS5": 1, "CGIS": 2}, "acceptWay": 1, "timePoint": {"reportedAt": "2026-10-05T12:18:19", "assignedAt": "2026-10-05T12:18:53", "acceptedAt": "2026-10-05T14:22:45", "outsideAt": "2026-10-08T19:00:00", "closedAt": "2026-10-09T14:51:11"}, "status": 1, "StatisfactionAvg": 5.0, "scores": {"initial": {"CTRS": 6, "GAF": 25, "BSRS5": 14, "CGIS": 5}, "m3": null, "m6": null}, "followUp": {"m3": null, "m6": null}, "his": {"ipdBefore": 0, "opdBefore": 0, "ipdAfter": null, "psyOpdAfter": null, "homeOpdAfter": null}},
     {"reportId": "20261007080723", "reporterDepartment": 3, "caseInfo": {"county": "臺北市", "dict": "萬華區", "longitude": 121.509, "latitude": 25.024, "gender": 10, "age": 48}, "assess": {"CTRS": 0, "GAF": 2, "BSRS5": 2, "CGIS": 2}, "acceptWay": 0, "timePoint": {"reportedAt": "2026-10-07T08:07:25", "assignedAt": "2026-10-07T08:25:07", "acceptedAt": "2026-10-07T08:26:25", "outsideAt": null, "closedAt": "2026-10-07T11:51:29"}, "status": 1, "StatisfactionAvg": 5.0, "scores": {"initial": {"CTRS": 10, "GAF": 40, "BSRS5": 23, "CGIS": 6}, "m3": null, "m6": null}, "followUp": {"m3": null, "m6": null}, "his": {"ipdBefore": 1, "opdBefore": 3, "ipdAfter": null, "psyOpdAfter": null, "homeOpdAfter": null}},
