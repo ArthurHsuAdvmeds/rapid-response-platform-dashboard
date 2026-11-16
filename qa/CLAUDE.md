@@ -4,7 +4,7 @@
 
 - **資料格式與平台專案要做的事以 [DATA_CONTRACT.md](DATA_CONTRACT.md) 為準，欄位以 [data.template.jsonc](data.template.jsonc)、[data-platform.template.jsonc](data-platform.template.jsonc)、[data-que.template.jsonc](data-que.template.jsonc) 為準。**
 - `data.json` 2026-11-11 起是使用者從平台取得的正式資料（同一天同步到 prod）；`data-platform.json` 還是虛構範例（`"sample": true`）。**不要手動改這兩個檔**。
-- `data-que.json` 是教育訓練課後問卷（真實資料，只有代碼與分數，沒有姓名、職務、時間、原文），**不要手動改**：由本機 `.tool/que_to_json.py` 從 `kpi/training_que.xlsx`（表單匯出）與 `kpi/org_type_training_que.xlsx`（場次清單）轉出，規則見 DATA_CONTRACT.md 第 9 節。
+- `data-que.json` 是教育訓練課後問卷（真實資料，只有代碼與分數，沒有姓名、職務、時間、原文），**不要手動改**：由本機 `.tool/que_to_json.py` 從 `kpi/training_que.xlsx`（表單匯出）與 `kpi/org_type_training_que.xlsx`（場次清單）轉出，一次寫 `qa/`、`prod/` 兩份（內容相同），規則見 DATA_CONTRACT.md 第 9 節。
   `.tool/qa_sample_data.py` 可以重產兩個檔的虛構範例（固定種子，重跑結果相同，會覆寫正式資料）。範例的通報日都在 2026/10/05–11/09（約 210 件）；為了讓要等結案、追蹤的頁面也有數字可驗，優化計畫結案時間壓短，3／6 個月追蹤與 HIS 次數不檢查時間是否已到（正式資料剛上線時這些頁面會是「—」）。
 - **AI模型預測準確率先隱藏**（使用者 2026-11-09 指示）：主選單按鈕註解掉、`#ai` 加 `hidden`、≥1200px 主選單少一欄（`<style id="qa-data">`）。程式、HTML 都保留，恢復時照按鈕旁的註解還原（含 `SHOW_AI` 改 `true`）。
 - **AI 預測放在 `data-platform.json` 的 `ai.predictions`，不在 `data.json`**（使用者 2026-11-11 指示）：一筆預測一個物件（`date`、`predicted`、`actual`、`modelVersion`），不帶 `reportId`，跟通報不對應；`normalizeCase()` 不讀通報裡的 `ai`。
@@ -120,11 +120,12 @@ prod/CLAUDE.md 第 2、3 節的規則（待派／已派、初評風險取 CTRS�
 
 ## 6. 更新到 prod 的檢查清單
 
-2026-11-11 照這份同步過一次（使用者指示，不搬 `data-platform.json` 與它的範本）；之後再同步的步驟見 [../prod/CLAUDE.md](../prod/CLAUDE.md) 第 6 節。
+2026-11-11 照這份同步過一次（使用者指示，不搬 `data-platform.json` 與它的範本），2026-11-13 再同步平台導入成效分析（第 6 項）；之後再同步的步驟見 [../prod/CLAUDE.md](../prod/CLAUDE.md) 第 6 節。
 
 1. 平台專案能穩定產生 v2 的 `data.json` 與 `data-platform.json`（先推到 `qa/` 驗證過）。
 2. `qa/index.html` 複製成 `prod/index.html`：拿掉標題的「｜QA」與檔頭 qa 註解；檔名不用改（同樣讀同資料夾的 `data.json`、`data-platform.json`）。
 3. `qa/DATA_CONTRACT.md` 與兩個範本搬到 `prod/`，路徑 `qa/` 改 `prod/`，取代 prod 舊的規格；`prod/CLAUDE.md` 改寫成這份的內容。
 4. 平台專案改成把 v2 推到 `prod/`；`qa/` 的範例檔視需要保留作為下一輪驗證用。
 5. 若 AI 頁、醫院內控指標、平台使用率仍要隱藏，照最上方的作法保留（連同 `SHOW_PLATFORM=false`、`SHOW_AI=false`，平台專案就不用推 `data-platform.json`）。同期比較的未啟用年份跟著 `index.html` 一起過去，prod 不用另外處理。
-6. 平台導入成效分析要一起上 prod 時，`data-que.json` 與 `data-que.template.jsonc` 也搬到 `prod/`（`que_to_json.py` 的輸出路徑改 `prod/data-que.json`）；不上的話把主選單按鈕註解掉、`#adoption` 加 `hidden`、主選單欄數減 1。
+6. 平台導入成效分析 2026-11-13 已一起上 prod（使用者指示）：`data-que.json` 與 `data-que.template.jsonc` 搬到 `prod/`、規格第 9 節複製到 prod 的規格；
+   `que_to_json.py` 沒指定輸出檔時同時寫 `qa/`、`prod/` 兩份（內容相同）。之後只在 qa 改這一頁的話，同步前 prod 會跟 qa 不同，記得照 prod/CLAUDE.md 第 6 節一起帶過去。

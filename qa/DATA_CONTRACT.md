@@ -167,10 +167,10 @@ HIS 的身分證比對在平台專案做完，檔案裡只放比對後的次數�
 
 ## 9. data-que.json（教育訓練課後問卷，schemaVersion 1）
 
-給原型 v10 新增的「平台導入成效分析」頁（2026-11-13 接到 qa）。欄位見 [data-que.template.jsonc](data-que.template.jsonc)。
+給原型 v10 新增的「平台導入成效分析」頁（2026-11-13 接到 qa，同一天同步到 prod）。欄位見 [data-que.template.jsonc](data-que.template.jsonc)。
 
 - **怎麼產生**：使用者從 Google 表單匯出 xlsx（放本機 `kpi/training_que.xlsx`），連同場次清單（`kpi/org_type_training_que.xlsx`：日期、場次（上午／下午）、單位名稱、單位類別），
-  在 repo 根目錄執行 `uv run --no-project python -I .tool/que_to_json.py`，覆寫 `qa/data-que.json`。兩個 xlsx 含個資或原文，只留本機（`kpi/` 已 gitignore）。
+  在 repo 根目錄執行 `uv run --no-project python -I .tool/que_to_json.py`，同時覆寫 `qa/data-que.json` 與 `prod/data-que.json`（內容相同；2026-11-13 起 prod 也有這一頁）。兩個 xlsx 含個資或原文，只留本機（`kpi/` 已 gitignore）。
   加 `--report 路徑` 會把每則自由填寫內容的歸類結果寫到那個檔，給人工檢查（含原文，不要放進 repo）。
 - **場次**：依場次清單。問卷依送出日期對到當天的場次：當天只有一場就算那一場（不看送出時間：2026/9/11、10/6 各有 2、5 份在下午才送出，算上午場）；
   當天有上午、下午兩場時，13:00 以前送出算上午場（上午課程常在 12:00 前後才收卷，例如 10/27 有 2 份 12:00 送出）。清單沒有的日期自動建一場（沒有單位名稱），轉檔時提醒。

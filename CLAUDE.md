@@ -19,11 +19,11 @@
 | 路徑 | 內容 | 進版控 | 文件 |
 | --- | --- | --- | --- |
 | `index.html` | 轉址到 `prod/` | ✓ | — |
-| `prod/` | 正式版：`index.html`（2026-11-11 由 qa 同步，原型 v9 全部頁面接資料；AI 頁、醫院內控指標、平台使用率隱藏中）＋ `data.json`（schemaVersion 2，平台專案定期 push）＋ `data.template.jsonc`；不用 `data-platform.json` | ✓ | [prod/CLAUDE.md](prod/CLAUDE.md)、[prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md) |
+| `prod/` | 正式版：`index.html`（2026-11-11 由 qa 同步，原型 v9 全部頁面接資料；2026-11-13 再同步 V10 的平台導入成效分析；AI 頁、醫院內控指標、平台使用率隱藏中）＋ `data.json`（schemaVersion 2，平台專案定期 push）＋ `data-que.json`（教育訓練課後問卷，`.tool/que_to_json.py` 與 qa 的同時寫）＋兩個範本；不用 `data-platform.json` | ✓ | [prod/CLAUDE.md](prod/CLAUDE.md)、[prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md) |
 | `qa/` | 驗證版：`index.html`（原型 v9 全部頁面接資料，AI 頁、醫院內控指標、指揮儀表板的平台使用率先隱藏，平台起始日固定 2026/10/05，同期比較中起始日以前的年份標示未啟用）＋ `data.json`（schemaVersion 2）＋ `data-platform.json`（SNQ、平台使用率、AI 預測；三處隱藏期間不讀）＋ `data-que.json`（教育訓練課後問卷，給 2026-11-13 加上的 V10「平台導入成效分析」頁，本機 `.tool/que_to_json.py` 轉出）；`data.json` 2026-11-11 起是平台的正式資料，`data-platform.json` 還是虛構範例；另有三個資料範本 `*.template.jsonc` | ✓ | [qa/CLAUDE.md](qa/CLAUDE.md)、[qa/DATA_CONTRACT.md](qa/DATA_CONTRACT.md) |
 | `prototype/` | `v1/`–`v10/` 原型（最新 `v10/`）、`release-note/`、轉址頁 `index.html` | ✓ | [prototype/CLAUDE.md](prototype/CLAUDE.md) |
 | `V9調整.md` | 客戶對 v9「醫療機構端處理成效分析」的調整清單（v9 的需求來源） | 使用者決定 | — |
-| `.tool/` | 本機工具：`qa_sample_data.py` 產生 qa 的虛構範例資料；`que_to_json.py` 把教育訓練問卷 xlsx 轉成 `qa/data-que.json`；也放驗證腳本與截圖 | ✗（`.gitignore`） | — |
+| `.tool/` | 本機工具：`qa_sample_data.py` 產生 qa 的虛構範例資料；`que_to_json.py` 把教育訓練問卷 xlsx 轉成 `qa/`、`prod/` 的 `data-que.json`；也放驗證腳本與截圖 | ✗（`.gitignore`） | — |
 | `kpi/` | `kpi.csv` 指標清單、`original_list.xlsx` 客戶原始清單、`training_que.xlsx` 教育訓練課後問卷（含填答者姓名，v10 的需求來源）、`org_type_training_que.xlsx` 教育訓練場次清單（日期、上午／下午、單位）。**只留本機**，不要 `git add -f` | ✗（`.gitignore`） | 第 6 節 |
 | `.github/workflows/pages.yml` | Pages 部署 | ✓ | **不要改**，除非使用者明確要求 |
 
@@ -37,7 +37,7 @@
   排程要拿到什麼、怎麼放，全部寫在 [prod/DATA_CONTRACT.md](prod/DATA_CONTRACT.md)；本 repo 不記排程的實作。
 - `qa/data.json`、`qa/data-platform.json` 用來驗證下一版（見 [qa/DATA_CONTRACT.md](qa/DATA_CONTRACT.md)）；`.tool/qa_sample_data.py` 可以重產虛構範例。
   2026-11-11 qa 驗證通過，prod 換成 qa 的版面與格式（[prod/CLAUDE.md](prod/CLAUDE.md) 第 6 節是之後再同步的步驟）。
-- 開發時**不要手動改 `prod/data.json`、`qa/` 的兩個資料檔，也不要把測試資料 commit 進去**。測別的資料用 file:// 選檔或 Playwright 攔截（見 prod/CLAUDE.md、qa/CLAUDE.md 第 5 節）。
+- 開發時**不要手動改 `prod/`、`qa/` 的資料檔（`data*.json`），也不要把測試資料 commit 進去**。測別的資料用 file:// 選檔或 Playwright 攔截（見 prod/CLAUDE.md、qa/CLAUDE.md 第 5 節）。
 - 格式要改：先改 DATA_CONTRACT.md，儀表板先支援新格式並上線，排程再切換。
 - 排程會一直推 `main`，所以**每次 push 前先 `git pull --rebase`**。
 
